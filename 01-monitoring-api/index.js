@@ -5,6 +5,8 @@ const fs = require('fs')
 const { StringDecoder } = require('string_decoder')
 
 const config = require('./config')
+const handlers = require('./lib/handlers')
+const { safeJSONparse } = require('./lib/helpers')
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -51,12 +53,12 @@ const requestHandler = (req, res) => {
       queryString,
       method,
       headers,
-      payload: buffer,
+      payload: safeJSONparse(buffer),
     }
 
     // Delegate the data to the respective handler
     const handler = (typeof(router[trimmedPath] === 'function') && router[trimmedPath]) || router.notFound
-    handler(data, (statusCode = 200, payload = {}) => {
+    handler(data, (statusCode, payload) => {
       // **This is a payload that is sent to the user**
       // sane defaults
       statusCode = typeof(statusCode) === 'number' ? statusCode : 200
@@ -79,22 +81,12 @@ const requestHandler = (req, res) => {
   })
 }
 
-// Router Handlers
-const handlers = {}
-handlers.ping = (data, callback) => {
-  // Callback a HTTP status code, and a payload object
-  callback(200, { status: 200 , message: 'Server is up and running. '})
-}
-
-handlers.notFound = (data, callback) => {
-  // Callback a HTTP status code, and a payload object
-  callback(404, { status: 404 , message: 'Sorry, I have nothing for you to serve at this route.'})
-}
-
 // Router
 const router = {
   ping: handlers.ping,
-  notFound: handlers.notFound
+  notFound: handlers.notFound,
+  users: handlers.users,
+  tokens: handlers.tokens,
 }
 
 
