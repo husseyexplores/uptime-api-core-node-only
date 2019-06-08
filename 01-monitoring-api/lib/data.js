@@ -6,6 +6,10 @@
 const fs = require('fs')
 const path = require('path')
 
+const { safeJSONparse } = require('./helpers')
+
+/////////////////////////////////////////////////////////////////////////////////
+
 const lib = {}
 
 // Base directory of the data folder
@@ -36,7 +40,9 @@ lib.create = (dir, filename, data, errCallback) => {
 // Read data from a file
 lib.read = (dir, filename, callback) => {
   fs.readFile(`${lib.baseDir}/${dir}/${filename}.json`, 'utf8', (err, data) => {
-    callback(err, data)
+    if (err && !data) return callback(err, data)
+
+    return callback(null, safeJSONparse(data))
   })
 }
 
