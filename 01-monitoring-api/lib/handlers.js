@@ -345,7 +345,6 @@ _tokens.put = (data, callback) => {
 // Tokens - delete
 // Required data: phone
 // Optional data: none
-// @TODO:
 _tokens.delete = (data, callback) => {
   let { id } = data.queryString
 
