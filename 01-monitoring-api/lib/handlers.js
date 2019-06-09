@@ -217,7 +217,7 @@ _users.delete = (data, callback) => {
           return callback(500, { _status: 500 , _error: 'Could not delete the specified user.' })
         }
 
-        callback(200, { _status: 500 , _message: 'User successfully deleted.' })
+        callback(200, { _status: 200 , _message: 'User successfully deleted.' })
       })
     })
   })
@@ -367,7 +367,7 @@ _tokens.delete = (data, callback) => {
         return callback(500, { _status: 500 , _error: 'Could not delete the specified token.' })
       }
 
-      callback(200, { _status: 500 , _message: 'Token successfully deleted.' })
+      callback(200, { _status: 200 , _message: 'Token successfully deleted.' })
     })
   })
 }
