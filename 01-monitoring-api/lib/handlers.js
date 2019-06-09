@@ -12,12 +12,12 @@ const handlers = {}
 
 handlers.ping = (data, callback) => {
   // Callback a HTTP status code, and a payload object
-  callback(200, { _status: 200 , _message: 'Server is up and running. '})
+  callback(200, { _status: 200 , _message: 'Server is up and running.' })
 }
 
 handlers.notFound = (data, callback) => {
   // Callback a HTTP status code, and a payload object
-  callback(404, { _status: 404 , _error: 'Sorry, I have nothing for you to serve at this route.'})
+  callback(404, { _status: 404 , _error: 'Sorry, I have nothing for you to serve at this route.' })
 }
 
 /* Users */
@@ -25,7 +25,7 @@ handlers.users = (data, callback) => {
   if (typeof(_users[data.method]) === 'function') {
     _users[data.method](data, callback)
   } else {
-    callback(405, { _status: 405 , _error: `Sorry, ${data.method} is not allowed for this route.`}) // HTTP code for method not allowed
+    callback(405, { _status: 405 , _error: `Sorry, ${data.method} is not allowed for this route.` }) // HTTP code for method not allowed
   }
 }
 
@@ -46,11 +46,11 @@ _users.post = (data, callback) => {
   tosAgreement = typeof (tosAgreement) === 'boolean' && tosAgreement
 
   if (!firstName || !lastName || !password || !phone) {
-    return callback(400, { _status: 400 , _error: 'Missing some required fields. Please check your data again.'})
+    return callback(400, { _status: 400 , _error: 'Missing some required fields. Please check your data again.' })
   }
 
   if (!tosAgreement) {
-    return callback(400, { _status: 400 , _error: 'You must agree to the terms of service.'})
+    return callback(400, { _status: 400 , _error: 'You must agree to the terms of service.' })
   }
 
   // Make sure the given user doesn't already exist (unique phone)
@@ -60,14 +60,14 @@ _users.post = (data, callback) => {
   dataLib.read('users', phone, (err, data) => {
     if (!err) {
       // User already exists
-      return callback(400, { _status: 400 , _error: `A user with phone number ${phone} already exists.`})
+      return callback(400, { _status: 400 , _error: `A user with phone number ${phone} already exists.` })
     }
 
     // User not exists, let's create one
     // Hash the pw
     const hashedPassword = helpers.hash(password)
     if (!hashedPassword) {
-      return callback(500, { _status: 500 , _error: 'Could not hash the user\'s password.'})
+      return callback(500, { _status: 500 , _error: 'Could not hash the user\'s password.' })
     }
 
     // Create user object
@@ -77,10 +77,10 @@ _users.post = (data, callback) => {
     dataLib.create('users', phone, userObject, err => {
       if (err) {
         console.log(err)
-        return callback(500, { _status: 500 , _error: 'Could not create the new user.'})
+        return callback(500, { _status: 500 , _error: 'Could not create the new user.' })
       }
 
-      return callback(200, { _status: 200 , _message: `User with phone ${phone} created successfully`})
+      return callback(200, { _status: 200 , _message: `User with phone ${phone} created successfully` })
     })
   })
 }
@@ -95,7 +95,7 @@ _users.get = (data, callback) => {
   phone = typeof(phone) === 'string' && phone.trim().length === 10 && phone.trim()
 
   if (!phone) {
-    return callback(400, { _status: 400 , _error: 'Missing/invalid required field. (phone)'})
+    return callback(400, { _status: 400 , _error: 'Missing/invalid required field. (phone)' })
   }
 
   // Get the token from the headers
@@ -104,13 +104,13 @@ _users.get = (data, callback) => {
   // Verify token
   verifyToken(tokenId, phone, isValid => {
     if (!isValid) {
-      return callback(401, { _status: 401 , _error: 'Token does not exist in header, or already expired.'})
+      return callback(401, { _status: 401 , _error: 'Token does not exist in header, or already expired.' })
     }
 
     // Lookup the user
     dataLib.read('users', phone, (err, userData) => {
       if (err && !userData) {
-        return callback(404, { _status: 404 , _error: `User with phone number ${phone} does not exist.`})
+        return callback(404, { _status: 404 , _error: `User with phone number ${phone} does not exist.` })
       }
 
       // Remove the hashed password before returning it to the requester
@@ -130,7 +130,7 @@ _users.put = (data, callback) => {
   phone = typeof(phone) === 'string' && phone.trim().length === 10 && phone.trim()
 
   if (!phone) {
-    return callback(400, { _status: 400 , _error: 'Missing/invalid required field. (phone)'})
+    return callback(400, { _status: 400 , _error: 'Missing/invalid required field. (phone)' })
   }
 
   // Check for the optional fields
@@ -139,7 +139,7 @@ _users.put = (data, callback) => {
   password = typeof (password) === 'string' && password.trim().length > 0 && password.trim()
 
   if (!firstName && !lastName && !password) {
-    return callback(400, { _status: 400 , _error: 'Missing required field(s). You must supply some data to update.'})
+    return callback(400, { _status: 400 , _error: 'Missing required field(s). You must supply some data to update.' })
   }
 
   // Get the token from the headers
@@ -148,13 +148,13 @@ _users.put = (data, callback) => {
   // Verify token
   verifyToken(tokenId, phone, isValid => {
     if (!isValid) {
-      return callback(401, { _status: 401 , _error: 'Token does not exist in header, or already expired.'})
+      return callback(401, { _status: 401 , _error: 'Token does not exist in header, or already expired.' })
     }
 
     // Lookup the user
     dataLib.read('users', phone, (err, userData) => {
       if (err && !userData) {
-        return callback(404, { _status: 404 , _error: `User with phone number ${phone} does not exist.`})
+        return callback(404, { _status: 404 , _error: `User with phone number ${phone} does not exist.` })
       }
 
       // Update the necessary fields
@@ -174,10 +174,10 @@ _users.put = (data, callback) => {
       dataLib.update('users', phone, userData, err => {
         if (err) {
           console.log(err)
-          return callback(500, { _status: 500 , _error: 'Could not update the user.'})
+          return callback(500, { _status: 500 , _error: 'Could not update the user.' })
         }
 
-        return callback(200, { _status: 200 , _message: 'User successfully updated.'})
+        return callback(200, { _status: 200 , _message: 'User successfully updated.' })
       })
     })
   })
@@ -193,7 +193,7 @@ _users.delete = (data, callback) => {
   phone = typeof(phone) === 'string' && phone.trim().length === 10 && phone.trim()
 
   if (!phone) {
-    return callback(400, { _status: 400 , _error: 'Missing/invalid required field. (phone)'})
+    return callback(400, { _status: 400 , _error: 'Missing/invalid required field. (phone)' })
   }
 
   // Get the token from the headers
@@ -202,22 +202,22 @@ _users.delete = (data, callback) => {
   // Verify token
   verifyToken(tokenId, phone, isValid => {
     if (!isValid) {
-      return callback(401, { _status: 401 , _error: 'Token does not exist in header, or already expired.'})
+      return callback(401, { _status: 401 , _error: 'Token does not exist in header, or already expired.' })
     }
 
     // Lookup the user
     dataLib.read('users', phone, (err, data) => {
       if (err && !data) {
-        return callback(404, { _status: 404 , _error: `User with phone number ${phone} does not exist.`})
+        return callback(404, { _status: 404 , _error: `User with phone number ${phone} does not exist.` })
       }
 
       // Remove the hashed password before returning it to the requester
       dataLib.delete('users', phone, err => {
         if (err) {
-          return callback(500, { _status: 500 , _error: 'Could not delete the specified user.'})
+          return callback(500, { _status: 500 , _error: 'Could not delete the specified user.' })
         }
 
-        callback(200, { _status: 500 , _message: 'User successfully deleted.'})
+        callback(200, { _status: 500 , _message: 'User successfully deleted.' })
       })
     })
   })
@@ -228,7 +228,7 @@ handlers.tokens = (data, callback) => {
   if (typeof(_tokens[data.method]) === 'function') {
     _tokens[data.method](data, callback)
   } else {
-    callback(405, { _status: 405 , _error: `Sorry, ${data.method} is not allowed for this route.`}) // HTTP code for method not allowed
+    callback(405, { _status: 405 , _error: `Sorry, ${data.method} is not allowed for this route.` }) // HTTP code for method not allowed
   }
 }
 
@@ -246,19 +246,19 @@ _tokens.post = (data, callback) => {
   password = typeof (password) === 'string' && password.trim().length > 0 && password.trim()
 
   if (!phone || !password) {
-    return callback(400, { _status: 400 , _error: 'Missing some required fields. Please check your data again.'})
+    return callback(400, { _status: 400 , _error: 'Missing some required fields. Please check your data again.' })
   }
 
   // Lookup the user who matches that phone number
   dataLib.read('users', phone, (err, userData) => {
     if (err && !userData) {
-      return callback(404, { _status: 404 , _error: 'Could not find the specified user.'})
+      return callback(404, { _status: 404 , _error: 'Could not find the specified user.' })
     }
 
     // User exists, now match the password hash
     if (helpers.hash(password) !== userData.hashedPassword) {
       // password invalid
-      return callback(400, { _status: 400 , _error: 'Invalid password.'})
+      return callback(400, { _status: 400 , _error: 'Invalid password.' })
     }
 
     // User is matched, create a token with a random value. Set expiration date 1 hour in future
@@ -269,7 +269,7 @@ _tokens.post = (data, callback) => {
     // Store the token
     dataLib.create('tokens', tokenId, tokenObject, err => {
       if (err) {
-        return callback(500, { _status: 500, _error: 'Error creating token. Please try again in a moment.'})
+        return callback(500, { _status: 500, _error: 'Error creating token. Please try again in a moment.' })
       }
 
       return callback(200, { _status: 200, data: tokenObject })
@@ -364,7 +364,7 @@ _tokens.delete = (data, callback) => {
     // Remove the hashed password before returning it to the requester
     dataLib.delete('tokens', id, err => {
       if (err) {
-        return callback(500, { _status: 500 , _error: 'Could not delete the specified token.'})
+        return callback(500, { _status: 500 , _error: 'Could not delete the specified token.' })
       }
 
       callback(200, { _status: 500 , _message: 'Token successfully deleted.' })
