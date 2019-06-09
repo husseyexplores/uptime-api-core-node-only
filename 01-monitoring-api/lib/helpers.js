@@ -27,4 +27,26 @@ helpers.safeJSONparse = jsonString => {
   }
 }
 
+// Random string generator - Alpha numeric
+helpers.createRandomString = length => {
+  if (typeof(length) !== 'number' || length < 1) {
+    return false
+  }
+
+  // Define all the possible character that could go into a string
+  const possibleChars = 'qwertyuiopasdfghjklzxcvbnm0123456789'
+
+  let str = ''
+
+  for (let i = 1; i <= length; i++) {
+    // Get a random character
+    const randomChar = possibleChars.charAt(Math.floor(Math.random() * possibleChars.length))
+
+    // Append it to the resulting string
+    str += randomChar
+  }
+
+  return str
+}
+
 module.exports = helpers
