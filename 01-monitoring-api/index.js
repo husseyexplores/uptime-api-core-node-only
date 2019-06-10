@@ -64,7 +64,7 @@ const requestHandler = (req, res) => {
       statusCode = typeof(statusCode) === 'number' ? statusCode : 200
       payload = typeof(payload) === 'object' ? payload : {}
 
-      // conver payload to string
+      // convert payload to string
       const payloadString = JSON.stringify(payload)
 
       // return the response
@@ -76,7 +76,6 @@ const requestHandler = (req, res) => {
 
       // Log the request path
       console.log(`Request is received on path \`${trimmedPath}\` with this method: \`${method}\``)
-      console.log(`Payload: ${buffer}`)
     })
   })
 }
