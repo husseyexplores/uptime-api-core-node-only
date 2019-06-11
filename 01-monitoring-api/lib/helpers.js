@@ -49,4 +49,35 @@ helpers.createRandomString = length => {
   return str
 }
 
+helpers.isString = value => typeof value === 'string'
+helpers.isNumber = value => typeof value === 'number'
+helpers.isObject = value => typeof value === 'object' && Array.isArray(value) === false
+helpers.isArray = value => typeof value === 'object' && Array.isArray(value)
+helpers.isInteger = value => Number.isInteger(value)
+helpers.inRange = (value, min, max) => value >= min && value <= max
+helpers.hasLength = arr => helpers.isArray(arr) && arr.length > 0
+helpers.lowerCase = value => {
+  if (helpers.isString(value)) {
+    return value.toLowerCase()
+  }
+
+  if (helpers.isArray(value)) {
+    return value.map(v => helpers.isString(v) ? v.toLowerCase() : v)
+  }
+}
+
+helpers.arrayOf = (type, arr) => {
+  if (!Array.isArray(arr)) return false
+
+  const types = {
+    numbers: v => typeof v === 'number',
+    integers: v => Number.isInteger(v),
+    strings: v => typeof v === 'string',
+    arrays: v => Array.isArray(v),
+    objects: v => helpers.isObject(v),
+  }
+
+  return types[type] ? arr.every(v => types[type](v)) : false
+}
+
 module.exports = helpers
