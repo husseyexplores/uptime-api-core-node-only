@@ -6,6 +6,7 @@ environments.staging = {
   httpsPort: 3001,
   envName: 'staging',
   hashSalt: 'thisIsAsuperSecretHashingSalt',
+  maxChecks: 5,
 }
 
 //  Production env
@@ -14,6 +15,7 @@ environments.production = {
   httpsPort: 5001,
   envName: 'production',
   hashSalt: 'thisIsAsuperSecretHashingSalt',
+  maxChecks: 5,
 }
 
 const currentEnv = typeof process.env.NODE_ENV === 'string' ? process.env.NODE_ENV.toLowerCase() : ''
