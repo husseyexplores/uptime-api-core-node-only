@@ -4,7 +4,18 @@
  */
 
  const dataLib = require('./data')
- const helpers = require('./helpers')
+ const {
+  hasLength,
+  arrayOf,
+  isInteger,
+  isString,
+  isArray,
+  inRange,
+  lowerCase,
+  createRandomString,
+  hash,
+ } = require('./helpers')
+ const { maxChecks } = require('../config')
 
  /////////////////////////////////////////////////////////////////////////////////
 
@@ -65,7 +76,7 @@ _users.post = (data, callback) => {
 
     // User not exists, let's create one
     // Hash the pw
-    const hashedPassword = helpers.hash(password)
+    const hashedPassword = hash(password)
     if (!hashedPassword) {
       return callback(500, { _status: 500 , _error: 'Could not hash the user\'s password.' })
     }
@@ -167,7 +178,7 @@ _users.put = (data, callback) => {
       }
 
       if (password) {
-        userData.hashedPassword = helpers.hash(password)
+        userData.hashedPassword = hash(password)
       }
 
       // Store the new updates to file
@@ -206,8 +217,8 @@ _users.delete = (data, callback) => {
     }
 
     // Lookup the user
-    dataLib.read('users', phone, (err, data) => {
-      if (err && !data) {
+    dataLib.read('users', phone, (err, userData) => {
+      if (err && !userData) {
         return callback(404, { _status: 404 , _error: `User with phone number ${phone} does not exist.` })
       }
 
@@ -217,7 +228,37 @@ _users.delete = (data, callback) => {
           return callback(500, { _status: 500 , _error: 'Could not delete the specified user.' })
         }
 
-        callback(200, { _status: 200 , _message: 'User successfully deleted.' })
+        // Delete each of the check associated with the user
+        const userChecks = userData.checks
+
+        // If there are no checks
+        if (!userChecks || (isArray(userChecks) && !hasLength(userChecks))) {
+          callback(200, { _status: 200 , _message: 'User successfully deleted.' })
+        }
+
+        const totalChecksToDelete = userChecks.length
+        let checksDeleted = 0;
+        let delettionErrors = false
+
+        // Loop through checks
+        userChecks.forEach(checkId => {
+          // Delete the check
+          dataLib.delete('checks', checkId, err => {
+            if (err) {
+              delettionErrors = true
+            }
+            checksDeleted++
+            if (checksDeleted === totalChecksToDelete) {
+              if (!delettionErrors) {
+                return callback(200, { _status: 200 , _message: 'User successfully deleted.' })
+              }
+
+              // Some error occured while deleting
+              return callback(200, { _status: 200 , _error: 'Errors encountered while attempting to delete all of the user\'s checks. All checks may not have been deleted from the system successfully.' })
+            }
+          })
+        })
+
       })
     })
   })
@@ -256,13 +297,13 @@ _tokens.post = (data, callback) => {
     }
 
     // User exists, now match the password hash
-    if (helpers.hash(password) !== userData.hashedPassword) {
+    if (hash(password) !== userData.hashedPassword) {
       // password invalid
       return callback(400, { _status: 400 , _error: 'Invalid password.' })
     }
 
     // User is matched, create a token with a random value. Set expiration date 1 hour in future
-    const tokenId = helpers.createRandomString(20);
+    const tokenId = createRandomString(20);
     const tokenExpiry = Date.now() + 60 * 60 * 1000 // 1 hour
     const tokenObject = { phone, id: tokenId, expires: tokenExpiry }
 
@@ -386,7 +427,270 @@ const verifyToken = (id, phone, callback) => {
     }
 
     // All set
-    return callback(true)
+    return callback(true, tokenData)
+  })
+}
+
+// Get the user data from the token id
+const getUserAuth = (tokenId, callback) => {
+  // Lookup the token
+  dataLib.read('tokens', tokenId, (err, tokenData) => {
+    if ((err && !tokenData) || Date.now() > tokenData.expires) {
+      return callback(false)
+    }
+
+    // Lookup the user
+    const userPhone = tokenData.phone
+
+    dataLib.read('users', userPhone, (err, userData) => {
+      if (err && !userData) {
+        return callback(false)
+      }
+
+      // Token exists and is valid, and user also exists
+      callback({ user: userData, token: tokenData })
+    })
+  })
+}
+
+// Verify user token from the headers
+
+/* Checks */
+handlers.checks = (data, callback) => {
+  if (typeof(_tokens[data.method]) === 'function') {
+    _checks[data.method](data, callback)
+  } else {
+    callback(405, { _status: 405 , _error: `Sorry, ${data.method} is not allowed for this route.` }) // HTTP code for method not allowed
+  }
+}
+
+// Checks submethods for each method type
+const _checks = {}
+
+// Checks - post
+// Required data: protocol, url, method, successCodes, timeoutSeconds
+// Optional data: none
+_checks.post = (data, callback) => {
+  let { protocol, url, method, successCodes, timeoutSeconds } = data.payload
+  const { token } = data.headers
+
+  // Lookup the user
+  getUserAuth(token, authData => {
+    if (!authData) {
+      return  callback(401, { _status: 401 , _error: 'Auth token is invalid/expired. Please login again.' })
+    }
+
+    const userData = authData.user
+
+    // Payload normalization
+    protocol = lowerCase(protocol)
+    url = lowerCase(url)
+    method = lowerCase(method)
+    successCodes = lowerCase(successCodes) // `lowerCase` works for Arrays too
+
+    // Sanity checks
+    protocol = isString(protocol) && ['http', 'https'].includes(protocol) && protocol
+    url = isString(url) && url.trim().length > 0 && url.trim()
+    method = isString(method) && ['post', 'get', 'put', 'delete'].includes(method) && method
+    successCodes = isArray(successCodes) && arrayOf('integers', successCodes) && hasLength(successCodes) && successCodes
+    timeoutSeconds = isInteger(timeoutSeconds) && inRange(timeoutSeconds, 1, 5) && timeoutSeconds
+
+    if (!protocol || !url || !method || !successCodes || !timeoutSeconds) {
+      return callback(400, { _status: 400 , _error: 'Some required fields are missing or invalid.' })
+    }
+
+    // Which checks the user already have
+    const userChecks = isArray(userData.checks) ? userData.checks : []
+
+    // Verify the user has max checks per user
+    if (userChecks.length >= maxChecks) {
+      return callback(403, { _status: 403 , _error: `Checks limit exceeded. Only ${maxChecks} are allowed per user.` })
+    }
+
+    // Create a random ID for the check
+    const checkId = createRandomString(20)
+
+    // Create the check object with user's phone
+    const checkObject = {
+      id: checkId,
+      userPhone: userData.phone,
+      protocol,
+      url,
+      method,
+      successCodes,
+      timeoutSeconds,
+    }
+
+    // Create the new check
+    dataLib.create('checks', checkId, checkObject, err => {
+      if (err) {
+        return callback(500, { _status: 500 , _error: 'Error creating check. Please try again in a moment.' })
+      }
+
+      // Add the checkId to user's object
+      userData.checks = userChecks
+      userData.checks.push(checkId)
+
+      // Save the new user data
+      dataLib.update('users', userData.phone, userData, err => {
+        if (err) {
+          // remove the recently created check
+          dataLib.delete('checks', checkId)
+          return callback(500, { _status: 500 , _error: 'Error update the user with the new check. Please try again in a moment.' })
+        }
+
+        // Return the data about the new check to the requester
+        callback(200, { _status: 200, data: checkObject })
+      })
+    })
+  })
+}
+
+// Checks - get
+// Required data:
+// Optional data: none
+_checks.get = (data, callback) => {
+  // Check the auth token first
+  getUserAuth(data.headers.token, authData => {
+    if (!authData) {
+      return  callback(401, { _status: 401 , _error: 'Auth token is invalid/expired. Please login again.' })
+    }
+
+    // Sanity checks
+    let { id } = data.queryString
+
+    // Check that the phone number provided is valid
+    id = isString(id) && id.trim().length === 20 && id.trim()
+
+    if (!id) {
+      return callback(400, { _status: 400 , _error: 'Missing/invalid required field. (id)' })
+    }
+
+    // Lookup the check
+    const userData = authData.user
+
+    dataLib.read('checks', id, (err, checkData) => {
+      if (err && !checkData) {
+        return callback(404, { _status: 404 , _error: `Check with the id ${id} does not exist.` })
+      }
+
+      if (userData.phone !== checkData.userPhone) {
+        return callback(401, { _status: 401 , _error: 'You\'re not authorized to access this token.' })
+      }
+
+      return callback(200, { _status: 200, data: checkData })
+    })
+  })
+}
+
+// Checks - put
+// Required data: id and at least one from the optional data
+// Optional data: protocol, url, method, successCodes, timeoutSeconds
+_checks.put = (data, callback) => {
+  let { id: checkId, protocol, url, method, successCodes, timeoutSeconds } = data.payload
+  const { token } = data.headers
+
+  // Lookup the user
+  getUserAuth(token, authData => {
+    if (!authData) {
+      return  callback(401, { _status: 401 , _error: 'Auth token is invalid/expired. Please login again.' })
+    }
+
+    const userData = authData.user
+
+    // Payload normalization
+    protocol = lowerCase(protocol)
+    url = lowerCase(url)
+    method = lowerCase(method)
+    successCodes = lowerCase(successCodes) // `lowerCase` works for Arrays too
+
+    // Sanity checks
+    protocol = isString(protocol) && ['http', 'https'].includes(protocol) && protocol
+    url = isString(url) && url.trim().length > 0 && url.trim()
+    method = isString(method) && ['post', 'get', 'put', 'delete'].includes(method) && method
+    successCodes = isArray(successCodes) && arrayOf('integers', successCodes) && hasLength(successCodes) && successCodes
+    timeoutSeconds = isInteger(timeoutSeconds) && inRange(timeoutSeconds, 1, 5) && timeoutSeconds
+
+    if (!protocol && !url && !method && !successCodes && !timeoutSeconds) {
+      return callback(400, { _status: 400 , _error: 'You must specify at least one field that needs to be modified. (protocol, url, method, successCodes, timeoutSeconds)' })
+    }
+
+    // Make sure if the check exist
+    dataLib.read('checks', checkId, (err, checkData) => {
+      if (err) {
+        return callback(404, { _status: 404 , _error: `There is no check with the id ${checkId}` })
+      }
+
+      // Update the check object
+      protocol && (checkData.protocol = protocol)
+      url && (checkData.url = url)
+      method && (checkData.method = method)
+      successCodes && (checkData.successCodes = successCodes)
+      timeoutSeconds && (checkData.timeoutSeconds = timeoutSeconds)
+
+      // Save the updated value to the check
+      dataLib.update('checks', checkId, checkData, err => {
+        if (err) {
+          return callback(500, { _status: 500 , _error: 'Error creating check. Please try again in a moment.' })
+        }
+
+        return callback(200, { _status: 200 , data: checkData })
+      })
+    })
+
+  })
+}
+
+// Checks - delete
+// Required data:
+// Optional data: none
+_checks.delete = (data, callback) => {
+  // Check the auth token first
+  getUserAuth(data.headers.token, authData => {
+    if (!authData) {
+      return  callback(401, { _status: 401 , _error: 'Auth token is invalid/expired. Please login again.' })
+    }
+
+    // Sanity checks
+    let { id } = data.queryString
+
+    // Check that the phone number provided is valid
+    id = isString(id) && id.trim().length === 20 && id.trim()
+
+    if (!id) {
+      return callback(400, { _status: 400 , _error: 'Missing/invalid required field. (id)' })
+    }
+
+    // Lookup the check
+    const userData = authData.user
+
+    dataLib.read('checks', id, (err, checkData) => {
+      if (err && !checkData) {
+        return callback(404, { _status: 404 , _error: `Check with the id ${id} does not exist.` })
+      }
+
+      if (userData.phone !== checkData.userPhone) {
+        return callback(401, { _status: 401 , _error: 'You\'re not authorized to delete this token.' })
+      }
+
+      // Delete the check
+      dataLib.delete('checks', id, err => {
+        if (err) {
+          return callback(500, { _status: 500, _error: 'Error deleting check. Please try again.' })
+        }
+
+        // Update the user object
+        userData.checks = userData.checks.filter(chkId => chkId !== id)
+        dataLib.update('users', userData.phone, userData, err => {
+          if (err) {
+            return callback(500, { _status: 500, _error: 'Could not update the user with the new data.' })
+          }
+
+          // Successfully deleted the check
+          return callback(200, { _status: 200, _message: `Successfully delete the check with the id ${id}` })
+        })
+      })
+    })
   })
 }
 
