@@ -1,4 +1,7 @@
+const { twilio } = require('../secret')
+
 const environments = {}
+
 
 //  Staging (default) env
 environments.staging = {
@@ -7,6 +10,7 @@ environments.staging = {
   envName: 'staging',
   hashSalt: 'thisIsAsuperSecretHashingSalt',
   maxChecks: 5,
+  twilio,
 }
 
 //  Production env
@@ -16,6 +20,7 @@ environments.production = {
   envName: 'production',
   hashSalt: 'thisIsAsuperSecretHashingSalt',
   maxChecks: 5,
+  twilio,
 }
 
 const currentEnv = typeof process.env.NODE_ENV === 'string' ? process.env.NODE_ENV.toLowerCase() : ''

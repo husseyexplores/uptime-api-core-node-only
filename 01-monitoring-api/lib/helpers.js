@@ -4,8 +4,10 @@
  */
 
 const crypto = require('crypto')
+const querystring = require('querystring')
+const https = require('https')
 
-const { hashSalt } = require('../config')
+const { hashSalt, twilio } = require('../config')
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +49,65 @@ helpers.createRandomString = length => {
   }
 
   return str
+}
+
+// Send SMS via twilio
+helpers.sendtwilioSMS = (phone, msg, callback = () => {}) => {
+  const msgLength = msg.trim().length
+  // Sanity checks
+  phone = helpers.isString(phone) && phone.trim().length === 10 && phone
+  msg = helpers.isString(msg) && helpers.inRange(msgLength, 1, 1600) && msg
+
+  if (!phone || !msg) return callback('Error Sending SMS. Given params were missing or invalid.')
+
+  // Configure the request payload
+  const payload = {
+    From: twilio.fromPhone,
+    To: '+1' + phone,
+    Body: msg
+  }
+  const stringifiedPayload = querystring.stringify(payload)
+
+  // Congigure the request details
+  const requestDetails = {
+    protocol: 'https:',
+    hostname: 'api.twilio.com',
+    method: 'POST',
+    path: `/2010-04-01/Accounts/${twilio.accountSid}/Messages.json`,
+    auth: `${twilio.accountSid}:${twilio.authToken}`,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(stringifiedPayload),
+    }
+  }
+
+  // Instantiate the request object
+  const request = https.request(requestDetails, response => {
+    // Grab the status of the sent request
+    const { statusCode, on } = response
+
+    let body = '';
+    response.on('data', function(chunk) {
+      body += chunk;
+    })
+
+    response.on('end', function() {
+      let err = null;
+      if (statusCode !== 200 && statusCode !== 201) {
+        err = `Status code returned was: ${statusCode}`
+      }
+      callback(err, body)
+    })
+  })
+
+  // Bind to the error event so it doesn't get thrown
+  request.on('error', err => callback(err))
+
+  // Add the payload
+  request.write(stringifiedPayload)
+
+  // End the request - (Send)
+  request.end()
 }
 
 helpers.isString = value => typeof value === 'string'
