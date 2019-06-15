@@ -10,15 +10,15 @@ const { safeJSONparse } = require('./helpers')
 
 /////////////////////////////////////////////////////////////////////////////////
 
-const lib = {}
+const file = {}
 
 // Base directory of the data folder
-lib.baseDir = path.join(__dirname, './../.data')
+file.baseDir = path.join(__dirname, './../.data')
 
 // Write data to a new file
-lib.create = (dir, filename, data, errCallback) => {
+file.create = (dir, filename, data, errCallback) => {
   // Open the file for writing
-  fs.open(`${lib.baseDir}/${dir}/${filename}.json`, 'wx', (err, fileDescriptor) => {
+  fs.open(`${file.baseDir}/${dir}/${filename}.json`, 'wx', (err, fileDescriptor) => {
     if (err && !fileDescriptor)
       return errCallback('Could not create  new file, it may already exist.')
 
@@ -38,8 +38,8 @@ lib.create = (dir, filename, data, errCallback) => {
 }
 
 // Read data from a file
-lib.read = (dir, filename, callback) => {
-  fs.readFile(`${lib.baseDir}/${dir}/${filename}.json`, 'utf8', (err, data) => {
+file.read = (dir, filename, callback) => {
+  fs.readFile(`${file.baseDir}/${dir}/${filename}.json`, 'utf8', (err, data) => {
     if (err && !data) return callback(err, data)
 
     return callback(null, safeJSONparse(data))
@@ -47,9 +47,9 @@ lib.read = (dir, filename, callback) => {
 }
 
 // Update the data from an existing file
-lib.update = (dir, filename, data, errCallback) => {
+file.update = (dir, filename, data, errCallback) => {
   // Open the file for updating
-  fs.open(`${lib.baseDir}/${dir}/${filename}.json`, 'r+', (err, fileDescriptor) => {
+  fs.open(`${file.baseDir}/${dir}/${filename}.json`, 'r+', (err, fileDescriptor) => {
     if (err && !fileDescriptor)
       return errCallback('Could not open the file for updating, it may not exist yet.')
 
@@ -75,12 +75,24 @@ lib.update = (dir, filename, data, errCallback) => {
 }
 
 // Date the file
-lib.delete = (dir, filename, errCallback) => {
+file.delete = (dir, filename, errCallback) => {
   // Unlink the file
-  fs.unlink(`${lib.baseDir}/${dir}/${filename}.json`, err => {
+  fs.unlink(`${file.baseDir}/${dir}/${filename}.json`, err => {
     if (err) return errCallback('Error deleteing/unlinking file.')
     return errCallback(null)
   })
 }
 
-module.exports = lib
+// List all the items in a directory
+file.list = (dir, callback) => {
+  fs.readdir(`${file.baseDir}/${dir}/`, (err, data) => {
+    if (err || !data || (Array.isArray(data) && data.length === 0)) {
+      return callback('Error while listing files.')
+    }
+
+    const trimmedFileNames = data.map(fileName => fileName.replace('.json', ''))
+    callback(null, trimmedFileNames)
+  })
+}
+
+module.exports = file

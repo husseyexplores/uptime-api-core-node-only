@@ -1,0 +1,199 @@
+/*
+ * Background worker related tasks
+ *
+ */
+
+const path = require('path')
+const fs = require('fs')
+const http = require('http')
+const https = require('https')
+const nodeURL = require('url')
+
+const dataLib = require('./data')
+const {
+  isArray,
+  arrayOf,
+  hasLength,
+  isInteger,
+  inRange,
+  isObject,
+  isString,
+  sendtwilioSMS,
+} = require('./helpers')
+
+/////////////////////////////////////////////////////////////////////////////////
+
+const workers = {}
+
+// Looks up all checks, get their data, send to a validator
+workers.gatherAllChecks = () => {
+  // Get all the checks that exists in the system
+  dataLib.list('checks', (err, checks) => {
+    if (err || !checks || (Array.isArray(checks) && checks.length === 0)) {
+      return console.log('Error: Could not find any checks to process')
+    }
+
+    checks.forEach(check => {
+      // Read in the check data
+      dataLib.read('checks', check, (err, originalCheckData) => {
+        if (err || !originalCheckData) {
+          return console(`Error reading one the checks data in 'gatherAllChecks' fn. Check id: ${check}`)
+        }
+
+        // Pass the data to the check validor
+        workers.validateCheckData(originalCheckData)
+      })
+    });
+  })
+}
+
+// Sanity checking the check data
+workers.validateCheckData = data => {
+  data = isObject(data) ? data : {}
+  let { id, userPhone, protocol, method, url, successCodes, timeoutSeconds, state, lastChecked } = data
+
+  id = isString(id) && id.length === 20 && id
+  userPhone = isString(userPhone) && userPhone.length === 10 && userPhone
+  protocol = isString(protocol) && ['http', 'https'].includes(protocol) && protocol
+  url = isString(url) && url.trim().length > 0 && url.trim()
+  method = isString(method) && ['post', 'get', 'put', 'delete'].includes(method) && method
+  successCodes = isArray(successCodes) && arrayOf('integers', successCodes) && hasLength(successCodes) && successCodes
+  timeoutSeconds = isInteger(timeoutSeconds) && inRange(timeoutSeconds, 1, 5) && timeoutSeconds
+
+  // Set the keys may not be set if the works have never seen this checks before
+  state = isString(state) && ['up', 'down'].includes(state) ? state : 'down'
+  lastChecked = isInteger(lastChecked) && lastChecked > 0 && lastChecked
+
+  // If all the values pass, then forward the data to the next step in the process
+  if (!id || !userPhone || !protocol || !url || !method || !successCodes || !timeoutSeconds) {
+    return console.log(`Check validation failed on check: ${id}. Check is not properly formatted.`)
+  }
+
+  const validatedData = { ...data, id, userPhone, protocol, url, method, successCodes, timeoutSeconds }
+
+  // Perform the check
+  workers.performCheck(validatedData)
+}
+
+workers.performCheck = data => {
+  const { protocol, url, method, timeoutSeconds } = data
+
+  // Prepare the initial argument
+  const checkOutcome = { error: false, responseCode: null }
+
+  // Mark that the outcome has not been sent yet - flag
+  let outcomeSent = false
+
+  // Parse the hostname and the path out of the check data
+  const parsedURL = nodeURL.parse(`${protocol}://${url}`, true)
+
+  // using `path`, not `pathname` because we want the query string in the url, if any
+  const { hostname, path } = parsedURL
+
+  // construct the request
+  const requestDetails = {
+    protocol: protocol + ':',
+    hostname,
+    method: method.toUpperCase(),
+    path,
+    timeout: timeoutSeconds * 1000 // convert to millisec
+  }
+
+  // Instantiate the request object using either the http or https module
+  const _moduleToUse = protocol === 'http' ? http : https
+
+  const request = _moduleToUse.request(requestDetails, res => {
+    // Grab the status of the sent request
+    const { statusCode } = res
+
+    // Update the check outcome and pass the data along
+    checkOutcome.responseCode = statusCode
+    if (!outcomeSent) {
+      workers.processCheckOutcome(data, checkOutcome)
+      outcomeSent = true
+    }
+  })
+
+  // Bind to the error so it doesn't get thrown
+  request.on('error', err => {
+    // Update the check outcome and pass the data alaong
+    checkOutcome.error = { error: true, value: err }
+
+    if (!outcomeSent) {
+      workers.processCheckOutcome(data, checkOutcome)
+      outcomeSent = true
+    }
+  })
+
+  // Bind to the timeout event
+  request.on('timeout', () => {
+    // Update the check outcome and pass the data alaong
+    checkOutcome.error = { error: true, value: 'timeout' }
+
+    if (!outcomeSent) {
+      workers.processCheckOutcome(data, checkOutcome)
+      outcomeSent = true
+    }
+  })
+
+  // End the request
+  request.end()
+}
+
+// Process the check outcome, update the check data as needed, trigger an alert if needed
+// Special logic for acomodating a check that has never been test/run before ('Don't alert the user')
+workers.processCheckOutcome = (data, checkOutcome) => {
+  // Decide if the check is considered up or down in the current state
+  console.log(checkOutcome)
+  const state = !checkOutcome.error && checkOutcome.responseCode && data.successCodes.includes(checkOutcome.responseCode) ? 'up' : 'down'
+
+  // Decide if the alert is warranted
+  const alertWarranted = data.lastChecked && data.state !== state
+
+  // Update the check data
+  const newCheckData = data
+  newCheckData.state = state
+  newCheckData.lastChecked = Date.now()
+
+  // Save the updates
+  dataLib.update('checks', data.id, newCheckData, err => {
+    if (err) {
+      return console.log(`Error trying to save updates to one of the checks: ${data.id}`)
+    }
+
+    // Send the new check data to the next phase in the process if needed
+    if (alertWarranted) {
+      workers.alertUserToStatusChange(newCheckData)
+    } else {
+      console.log(`Check outcome has not been changed for ${data.id}. No alert needed`)
+    }
+  })
+}
+
+// Alert to a user as to change in their check status
+workers.alertUserToStatusChange = checkData => {
+  const msg = `Alert: Your check for ${checkData.method.toUpperCase()} ${checkData.protocol}://${checkData.url} is currently ${checkData.state}`
+
+  // Initiate the call to alert the user
+  sendtwilioSMS(checkData.userPhone, msg, err => {
+    if (err) {
+      return console.log(`Error sending sms to ${checkData.userPhone}`, err)
+    }
+
+    console.log(`Success: ${checkData.userPhone} was alerted to a status change in their check via sms.`, '\n', msg)
+  })
+
+}
+
+// Timer to execute the worker-process once per minute
+workers.loop = () => setInterval(workers.gatherAllChecks, 1000 * 60); // one minute
+
+workers.init = () => {
+  // Execute all the checks immediately once the app starts
+  workers.gatherAllChecks()
+
+  // Call the loop so the checks will execute late on
+  workers.loop()
+}
+
+module.exports = workers
