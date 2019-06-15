@@ -1,4 +1,4 @@
-const { twilio } = require('../secret')
+const { twilio } = require('./secret')
 
 const environments = {}
 
