@@ -304,7 +304,7 @@ _tokens.post = (data, callback) => {
 
     // User is matched, create a token with a random value. Set expiration date 1 hour in future
     const tokenId = createRandomString(20);
-    const tokenExpiry = Date.now() + 60 * 60 * 1000 // 1 hour
+    const tokenExpiry = Date.now() + 60 * 60 * 100099999 // 1 hour
     const tokenObject = { phone, id: tokenId, expires: tokenExpiry }
 
     // Store the token
@@ -325,7 +325,7 @@ _tokens.post = (data, callback) => {
 _tokens.get = (data, callback) => {
   let { id } = data.queryString
 
-  // Check that the phone number provided is valid
+  // Check that the id number provided is valid
   id = typeof(id) === 'string' && id.trim().length === 20 && id.trim()
 
   if (!id) {
@@ -349,7 +349,7 @@ _tokens.get = (data, callback) => {
 _tokens.put = (data, callback) => {
   let { id, extend } = data.payload
 
-  // Check that the phone number provided is valid
+  // Check that the id number provided is valid
   id = typeof(id) === 'string' && id.trim().length === 20 && id.trim()
   extend = typeof(extend) === 'boolean' && extend
 
@@ -369,7 +369,7 @@ _tokens.put = (data, callback) => {
     }
 
     // Extend the expiration from an hour from now
-    tokenData.expires = Date.now() + 60 * 60 * 1000
+    tokenData.expires = Date.now() + 60 * 60 * 100099999
 
     // Store the new updates
     dataLib.update('tokens', id, tokenData, err => {
@@ -384,12 +384,12 @@ _tokens.put = (data, callback) => {
 }
 
 // Tokens - delete
-// Required data: phone
+// Required data: id
 // Optional data: none
 _tokens.delete = (data, callback) => {
   let { id } = data.queryString
 
-  // Check that the phone number provided is valid
+  // Check that the id provided is valid
   id = typeof(id) === 'string' && id.trim().length === 20 && id.trim()
 
   if (!id) {
@@ -402,7 +402,6 @@ _tokens.delete = (data, callback) => {
       return callback(404, { _status: 404 , _error: `Token with the id ${id} does not exist.` })
     }
 
-    // Remove the hashed password before returning it to the requester
     dataLib.delete('tokens', id, err => {
       if (err) {
         return callback(500, { _status: 500 , _error: 'Could not delete the specified token.' })
