@@ -20,7 +20,6 @@
 .vscode
 .idea
 .env
-.data
 
 .firebase
 .firebaserc
