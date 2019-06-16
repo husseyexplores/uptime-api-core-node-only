@@ -3,11 +3,14 @@ const https = require('https')
 const url = require('url')
 const fs = require('fs')
 const path = require('path')
+const util = require('util')
 const { StringDecoder } = require('string_decoder')
 
 const config = require('../config')
 const handlers = require('./handlers')
 const { safeJSONparse } = require('./helpers')
+
+const debug = util.debuglog('server')
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +30,6 @@ server.httpsServerOptions = {
   cert: fs.readFileSync(path.join(__dirname, '../https/cert.pem')),
 }
 
-// Request handlers for HTTP and HTTPS servers
 server.requestHandler = (req, res) => {
   // Parse the URL
   const parsedURL = url.parse(req.url, true)
@@ -53,7 +55,6 @@ server.requestHandler = (req, res) => {
     buffer += decoder.write(chunk)
 
     // Too much POST data, kill the connection!
-    // Or can also return HTTP 413 Error Code (Request Entity Too Large)
     // 1e6 === 1 * Math.pow(10, 6) === 1 * 1000000 ~~~ 1MB
     if (buffer.length > 1e6) {
       res.writeHead(413)
@@ -92,8 +93,12 @@ server.requestHandler = (req, res) => {
 
       if (trimmedPath === 'favicon.ico') return
 
-      // Log the request path
-      console.log(`Request is received on path \`${trimmedPath}\` with this method: \`${method}\``)
+      // If the response is 200, print in green, otherwise print red
+      if (statusCode === 200) {
+        debug('\x1b[32m%s\x1b[0m', `${method.toUpperCase()} | ${trimmedPath} | ${statusCode}`) // green
+      } else {
+        debug('\x1b[31m%s\x1b[0m', `${method.toUpperCase()} | ${trimmedPath} | ${statusCode}`) // red
+      }
     })
   })
 }
@@ -104,12 +109,12 @@ server.httpsServer = https.createServer(server.httpsServerOptions, server.reques
 server.init = () => {
   // Start the HTTP Server
   server.httpServer.listen(config.httpPort, () => {
-    console.log(`*HTTP Server started at port ${config.httpPort} in ${config.envName} environment.*`)
+    console.log('\x1b[36m%s\x1b[0m', `*HTTP Server started at port ${config.httpPort} in ${config.envName} environment.*`)
   })
 
   // Start the HTTPS Server
   server.httpsServer.listen(config.httpsPort, () => {
-    console.log(`*HTTPS Server started at port ${config.httpsPort} in ${config.envName} environment.*`)
+    console.log('\x1b[35m%s\x1b[0m', `*HTTPS Server started at port ${config.httpsPort} in ${config.envName} environment.*`)
   })
 }
 

@@ -8,6 +8,7 @@ const fs = require('fs')
 const http = require('http')
 const https = require('https')
 const nodeURL = require('url')
+const util = require('util')
 
 const dataLib = require('./data')
 const logs = require('./logs')
@@ -22,6 +23,8 @@ const {
   sendtwilioSMS,
 } = require('./helpers')
 
+const debug = util.debuglog('workers')
+
 /////////////////////////////////////////////////////////////////////////////////
 
 const workers = {}
@@ -31,14 +34,14 @@ workers.gatherAllChecks = () => {
   // Get all the checks that exists in the system
   dataLib.list('checks', (err, checks) => {
     if (err || !checks || (Array.isArray(checks) && checks.length === 0)) {
-      return console.log('Error: Could not find any checks to process')
+      return debug('Error: Could not find any checks to process')
     }
 
     checks.forEach(check => {
       // Read in the check data
       dataLib.read('checks', check, (err, originalCheckData) => {
         if (err || !originalCheckData) {
-          return console(`Error reading one the checks data in 'gatherAllChecks' fn. Check id: ${check}`)
+          return debug(`Error reading one the checks data in 'gatherAllChecks' fn. Check id: ${check}`)
         }
 
         // Pass the data to the check validor
@@ -67,7 +70,7 @@ workers.validateCheckData = data => {
 
   // If all the values pass, then forward the data to the next step in the process
   if (!id || !userPhone || !protocol || !url || !method || !successCodes || !timeoutSeconds) {
-    return console.log(`Check validation failed on check: ${id}. Check is not properly formatted.`)
+    return debug(`Check validation failed on check: ${id}. Check is not properly formatted.`)
   }
 
   const validatedData = { ...data, id, userPhone, protocol, url, method, successCodes, timeoutSeconds }
@@ -163,14 +166,14 @@ workers.processCheckOutcome = (data, checkOutcome) => {
   // Save the updates
   dataLib.update('checks', data.id, newCheckData, err => {
     if (err) {
-      return console.log(`Error trying to save updates to one of the checks: ${data.id}`)
+      return debug(`Error trying to save updates to one of the checks: ${data.id}`)
     }
 
     // Send the new check data to the next phase in the process if needed
     if (alertWarranted) {
       workers.alertUserToStatusChange(newCheckData)
     } else {
-      console.log(`Check outcome has not been changed for ${data.id}. No alert needed`)
+      debug(`Check outcome has not been changed for ${data.id}. No alert needed`)
     }
   })
 }
@@ -182,10 +185,10 @@ workers.alertUserToStatusChange = checkData => {
   // Initiate the call to alert the user
   sendtwilioSMS(checkData.userPhone, msg, err => {
     if (err) {
-      return console.log(`Error sending sms to ${checkData.userPhone}`, err)
+      return debug(`Error sending sms to ${checkData.userPhone}`, err)
     }
 
-    console.log(`Success: ${checkData.userPhone} was alerted to a status change in their check via sms.`, '\n', msg)
+    debug(`Success: ${checkData.userPhone} was alerted to a status change in their check via sms.`, '\n', msg)
   })
 
 }
@@ -201,10 +204,10 @@ workers.log = ({ check, outcome, state, alert, time }) => {
   // Append the log data to the file
   logs.append(fileName, logData, err => {
     if (err) {
-      return console.log(`Error: Logging to file ${fileName} failed.`)
+      return debug(`Error: Logging to file ${fileName} failed.`)
     }
 
-    console.log(`Logging to file ${fileName} succeeded.`)
+    debug(`Logging to file ${fileName} succeeded.`)
   })
 }
 
@@ -216,7 +219,7 @@ workers.rotateLogs = () => {
   // List all the non-compressed log files
   logs.list(false, (err, logFileNames) => {
     if (err || !logFileNames || !hasLength(logFileNames)) {
-      return console.log('Error: Could not find any logs to rotate.')
+      return debug('Error: Could not find any logs to rotate.')
     }
 
     logFileNames.forEach(fileName => {
@@ -226,16 +229,16 @@ workers.rotateLogs = () => {
       const compressedFileId = `${logId}-${Date.now()}`
       logs.compress(logId, compressedFileId, err => {
         if (err) {
-          return console.log(`Error: Could not compress the ${logId} log file.`, err)
+          return debug(`Error: Could not compress the ${logId} log file.`, err)
         }
 
         // Truncate the log
         logs.truncate(logId, err => {
           if (err) {
-            return console.log(`Error: Could not truncate the ${compressedFileId} log file.`, err)
+            return debug(`Error: Could not truncate the ${compressedFileId} log file.`, err)
           }
 
-          console.log(`Success truncating the ${compressedFileId} log file.`)
+          debug(`Success truncating the ${compressedFileId} log file.`)
         })
 
       })
@@ -247,17 +250,19 @@ workers.rotateLogs = () => {
 workers.logRotationLoop = () => setInterval(workers.rotateLogs, 1000 * 60 * 60 * 24); // one day
 
 workers.init = () => {
-  // Execute all the checks immediately once the app starts
-  workers.gatherAllChecks()
+  console.log('\x1b[33m%s\x1b[0m', 'Background workers have been started.')
 
-  // Call the loop so the checks will execute late on
-  workers.loop()
+  // // Execute all the checks immediately once the app starts
+  // workers.gatherAllChecks()
 
-  // Comppress all the logs immediately
-  workers.rotateLogs()
+  // // Call the loop so the checks will execute late on
+  // workers.loop()
 
-  // Call the compression loop so the logs will be compress later on
-  workers.logRotationLoop()
+  // // Comppress all the logs immediately
+  // workers.rotateLogs()
+
+  // // Call the compression loop so the logs will be compress later on
+  // workers.logRotationLoop()
 }
 
 module.exports = workers
