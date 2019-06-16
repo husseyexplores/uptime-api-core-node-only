@@ -57,7 +57,7 @@ file.update = (dir, filename, data, errCallback) => {
     const stringData = JSON.stringify(data);
 
     // Truncate the file
-    fs.truncate(fileDescriptor, err => {
+    fs.ftruncate(fileDescriptor, err => {
       if (err) return errCallback('Error truncating file')
 
       // Write to the file and close it
