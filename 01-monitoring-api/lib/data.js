@@ -90,7 +90,10 @@ file.list = (dir, callback) => {
       return callback('Error while listing files.')
     }
 
-    const trimmedFileNames = data.map(fileName => fileName.replace('.json', ''))
+    // Filter out hidden files
+    const fileNames = data.filter(fileName => !fileName.startsWith('.'))
+
+    const trimmedFileNames = fileNames.map(fileName => fileName.replace('.json', ''))
     callback(null, trimmedFileNames)
   })
 }
