@@ -116,7 +116,7 @@ logs.decompress = (fileId, callback) => {
 
     // Decompress the data
     const inputBuffer = Buffer.from(data, 'base64')
-    zlib.unzip(buffer, (err, outputBuffer) => {
+    zlib.unzip(inputBuffer, (err, outputBuffer) => {
       if (err || !outputBuffer) {
         return callback(err)
       }
