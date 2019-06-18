@@ -6,8 +6,10 @@
 const crypto = require('crypto')
 const querystring = require('querystring')
 const https = require('https')
+const path = require('path')
+const fs = require('fs')
 
-const { hashSalt, twilio } = require('../config')
+const { hashSalt, twilio, templateGlobals } = require('../config')
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -139,6 +141,82 @@ helpers.arrayOf = (type, arr) => {
   }
 
   return types[type] ? arr.every(v => types[type](v)) : false
+}
+
+// Get the string content of a template
+helpers.getTemplate = (templateName, data, callback) => {
+  templateName = helpers.isString(templateName) && templateName.length > 0 && templateName
+  data = helpers.isObject(data) ? data : {}
+  if (!templateName) return callback('A valid template name was not specified.')
+
+  const templatesDir = path.join(__dirname, '../templates')
+  fs.readFile(`${templatesDir}/${templateName}.html`, 'utf-8', (err, templateData) => {
+    if (err || !templateData) {
+      return callback('Error reading template data.')
+    }
+    // Do the interpolation on the string
+    const finalString = helpers.interpolate(templateData, data)
+    callback(null, finalString)
+  })
+}
+
+// Add the universal header and footer to a string and pass the provided
+// data object to the header to the header and footer for interpolation
+helpers.addPartialTemplates = (contentHtml, data, callback) => {
+  contentHtml = helpers.isString(contentHtml) && contentHtml.length > 0 ? contentHtml : ''
+  data = helpers.isObject(data) ? data : {}
+
+  // Get the header
+  helpers.getTemplate('_header', data, (err, headerHtml) => {
+    if (err || !headerHtml) return callback('Could not find the header template.')
+
+    // Get the footer
+    helpers.getTemplate('_footer', data, (err, footerHtml) => {
+      if (err || !footerHtml) return callback('Could not find the footer template.')
+
+      // Add these strings together
+      const fullPageHTML = headerHtml + contentHtml + footerHtml
+      callback(null, fullPageHTML)
+    })
+  })
+}
+
+// Take a given string and data object and find/replace all the keys within it
+helpers.interpolate = (str, data) => {
+  str = helpers.isString(str) && str.length > 0 ? str : ''
+  data = helpers.isObject(data) ? data : {}
+
+  // Add the template globals to the data object, prepending it with their key name "global"
+  for (let key in templateGlobals) {
+    if (templateGlobals.hasOwnProperty(key)) {
+      data[`global.${key}`] = templateGlobals[key]
+    }
+  }
+
+  // For each in key in the data object, insert its value into the string at the corresponding placeholder
+  for (let key in data) {
+    if (data.hasOwnProperty(key) && (helpers.isString(data[key]) || helpers.isNumber(data[key]))) {
+      const replace = data[key]
+      const find = `{${key}}`
+      str = str.replace(find, replace)
+    }
+  }
+
+  return str
+}
+
+// Returns the static asset from the public directory
+helpers.getStaticAsset = (name, callback) => {
+  name = helpers.isString(name) && name.length > 0 && name
+  if (!name) return callback('A valid asset filename was not specified.')
+
+  const publicDir = path.join(__dirname, '../public')
+
+  fs.readFile(`${publicDir}/${name}`, (err, data) => {
+    if (err || !data) return callback(`Could not find the asset ${name}`)
+
+    callback(null, data)
+  })
 }
 
 module.exports = helpers

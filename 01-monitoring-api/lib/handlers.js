@@ -14,14 +14,122 @@
   lowerCase,
   createRandomString,
   hash,
+  getTemplate,
+  addPartialTemplates,
+  getStaticAsset,
  } = require('./helpers')
  const { maxChecks } = require('../config')
 
  /////////////////////////////////////////////////////////////////////////////////
 
-const handlers = {}
+ const handlers = {}
+ /*
 
-handlers.ping = (data, callback) => {
+ * HTML handlers
+ *
+ */
+
+// Index handler
+handlers.index = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Home',
+    'head.description': 'This is the meta description',
+    'body.title': 'Hello templated world!',
+    'body.class': 'index',
+  }
+
+  // Read in a template as a string
+  getTemplate('index', templateData, (err, indexHtml) => {
+    if (err || !indexHtml) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(indexHtml, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
+// Favicon handler
+handlers.favicon = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Read in the favicon's data
+  getStaticAsset('favicon.ico', (err, favicon) => {
+    if (err || !favicon) {
+      return callback(500, undefined, 'html')
+    }
+
+    callback(200, favicon, 'favicon')
+  })
+}
+
+// Public Assets
+handlers.public = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Get the filename that is being requested
+  const assetName = data.trimmedPath.replace('public/', '')
+  if (assetName.length === 0) return callback(404, undefined, 'html')
+
+  // Read in the favicon's data
+  getStaticAsset(assetName, (err, assetData) => {
+    if (err || !assetData) {
+      return callback(404, undefined, 'html')
+    }
+
+    // Determin the asset content type via file extension
+    let contentType // default
+    switch (true) {
+      case (assetName.includes('.css')):
+        contentType = 'css'
+        break
+
+      case (assetName.includes('.png')):
+        contentType = 'png'
+        break
+
+      case (assetName.includes('.jpg')):
+          contentType = 'jpg'
+        break
+
+      case (assetName.includes('.ico')):
+        contentType = 'favicon'
+        break
+
+      case (assetName.includes('.js')):
+        contentType = 'js'
+        break
+
+      default:
+        contentType = 'plain'
+        break
+    }
+
+    callback(200, assetData, contentType)
+  })
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+/*
+ * JSON API handlers
+ *
+ */
+
+ handlers.ping = (data, callback) => {
   // Callback a HTTP status code, and a payload object
   callback(200, { _status: 200 , _message: 'Server is up and running.' })
 }
