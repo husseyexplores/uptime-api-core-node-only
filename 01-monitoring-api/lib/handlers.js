@@ -37,9 +37,8 @@ handlers.index = (data, callback) => {
 
   // Prepare data for interpolation
   const templateData = {
-    'head.title': 'Home',
-    'head.description': 'This is the meta description',
-    'body.title': 'Hello templated world!',
+    'head.title': 'Uptime Monitoring - Made Simple',
+    'head.description': 'We offer free, simple uptime monitoring for HTTP/HTTPS sites of all kinds. When your site goes down, we\'ll send you a text to let you know.',
     'body.class': 'index',
   }
 
@@ -50,6 +49,90 @@ handlers.index = (data, callback) => {
     }
     // Add the universal header and footer
     addPartialTemplates(indexHtml, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
+// Create account handler
+handlers.accountCreate = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Create an Account',
+    'head.description': 'Sign up is easy and only taks a few seconds.',
+    'body.class': 'accountCreate',
+  }
+
+  // Read in a template as a string
+  getTemplate('accountCreate', templateData, (err, contentHTML) => {
+    if (err || !contentHTML) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(contentHTML, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
+// Create session handler
+handlers.sessionCreate = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Login to your Account',
+    'head.description': 'Please enter your phone number and password to access your account.',
+    'body.class': 'sessionCreate',
+  }
+
+  // Read in a template as a string
+  getTemplate('sessionCreate', templateData, (err, contentHTML) => {
+    if (err || !contentHTML) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(contentHTML, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
+// Session has been deleted
+handlers.sessionDeleted = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Logged out',
+    'head.description': 'You have been logged out of your account.',
+    'body.class': 'sessionDeleted',
+  }
+
+  // Read in a template as a string
+  getTemplate('sessionDeleted', templateData, (err, contentHTML) => {
+    if (err || !contentHTML) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(contentHTML, templateData, (err, fullPageHTML) => {
       if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
 
       // Return the final html back to the requester
@@ -486,7 +569,7 @@ _tokens.put = (data, callback) => {
         return callback(500, { _status: 500 , _error: 'Could not update the token. Please try again in a moment.' })
       }
 
-      return callback(200, { _status: 200 , _message: 'Token successfully updated.' })
+      return callback(200, { _status: 200 , _message: 'Token successfully updated.', data: tokenData})
     })
   })
 }

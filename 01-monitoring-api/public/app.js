@@ -2,7 +2,13 @@
  * Frontend logic for the app
  *
  */
+const log = {
+  green: (...args) => args.forEach(arg => typeof arg === 'string' ? console.log('%c' + arg, 'display: inline-block; font-weight: 700; letter-spacing: 2px; padding: 6px 12px; background: #73e09e; color: #025021;') : console.log(arg)),
 
+  red: (...args) => args.forEach(arg => typeof arg === 'string' ? console.log('%c' + arg, 'display: inline-block; font-weight: 700; letter-spacing: 2px; padding: 6px 12px; background: pink; color: #fff;') : console.log(arg)),
+
+  magenta: (...args) => args.forEach(arg => typeof arg === 'string' ? console.log('%c' + arg, 'display: inline-block; font-weight: 700; letter-spacing: 2px; padding: 6px 12px; background: #9f049d; color: #fff;') : console.log(arg)),
+}
 // Container for the front-end app
 const app = {}
 
@@ -71,4 +77,232 @@ app.client.request = ({ headers, url, method, qs, data, success, error } = {}) =
 
   // Send the payload as JSON
   xhr.send(JSON.stringify(data))
+}
+
+// Log out the user then redirect them
+app.logUserOut = () => {
+  // Get the current token id
+  const { sessionToken: token } = app.config
+  const tokenId = token && typeof token.id === 'string' && token.id
+  if (!tokenId) return log.red('Error logging out. Failed to find tokenId.')
+
+  app.client.request({
+    url: '/api/tokens',
+    method: 'DELETE',
+    qs: { id: tokenId },
+    success: (statusCode, response) => {
+      // Update the app.config token as false
+      app.setSessionToken(false)
+
+      // Send the user to the logged out page,
+      window.location = '/session/deleted'
+    }
+  })
+}
+
+// Bind the logout button
+app.bindLogoutButton = () => {
+  const logoutButton = document.getElementById('logoutButton')
+  if (!logoutButton) return
+
+  logoutButton.addEventListener('click', e => {
+    e.preventDefault()
+    app.logUserOut()
+  })
+}
+
+// Bind the forms
+app.bindForms = () => {
+  const form = document.querySelector("form")
+  if (!form) return
+
+  form.addEventListener("submit", function(e) {
+    // Stop it from submitting
+    e.preventDefault();
+    const formId = this.id;
+
+    // Remove host name from request path, because request client function prepends it
+    const regex = new RegExp('(https?:\/\/)?' + window.location.host, 'gi')
+    const path = this.action.replace(regex, '')
+    const method = this.method.toUpperCase()
+
+    // Hide the error message (if it's currently shown due to a previous error)
+    document.querySelector("#"+formId+" .formError").style.display = 'hidden'
+
+    // Turn the inputs into a payload
+    const payload = {};
+    const elements = this.elements
+    for(let i = 0; i < elements.length; i++){
+      if(elements[i].type !== 'submit'){
+        const valueOfElement = elements[i].type == 'checkbox' ? elements[i].checked : elements[i].value
+        payload[elements[i].name] = valueOfElement
+      }
+    }
+
+    // Call the API
+    app.client.request({
+      url: path,
+      method,
+      data: payload,
+      success: (statusCode, response) => {
+        const responsePayload = response.data
+        // If successful, send to form response processor
+        app.formResponseProcessor(formId,payload,responsePayload);
+      },
+      error: (statusCode, response) => {
+        // Try to get the error from the api, or set a default error message
+        var error = typeof(response._error) == 'string' ? response._error : 'An error has occured, please try again';
+
+        // Set the formError field with the error text
+        document.querySelector("#"+formId+" .formError").innerHTML = error;
+
+        // Show (unhide) the form error field on the form
+        document.querySelector("#"+formId+" .formError").style.display = 'block';
+      },
+    })
+  })
+}
+
+// Form response processor
+app.formResponseProcessor = (formId, requestPayload, responsePayload) =>{
+  var functionToCall = false
+  // If account creation was successful, try to immediately log the user in
+  if(formId === 'accountCreate') {
+    // Take the phone and password, and use it to log the user in
+    const createSesionPayload = {
+      phone : requestPayload.phone,
+      password : requestPayload.password,
+    }
+
+    app.client.request({
+      url: 'api/tokens',
+      method: 'POST',
+      data: createSesionPayload,
+      success: (statusCode, response) => {
+        const responsePayload = response.data
+        // If successful, set the token and redirect the user
+        app.setSessionToken(responsePayload);
+        window.location = '/checks/all'
+      },
+      error: (statusCode, response) => {
+        // Try to get the error from the api, or set a default error message
+        const error = typeof(response._error) == 'string' ? response._error : 'Sorry, an error has occured. Please try again.'
+
+        // Set the formError field with the error text
+        document.querySelector("#"+formId+" .formError").innerHTML = error
+
+        // Show (unhide) the form error field on the form
+        document.querySelector("#"+formId+" .formError").style.display = 'block'
+      },
+    })
+  }
+
+  // If login was successful, set the token in localstorage and redirect the user
+  if(formId === 'sessionCreate'){
+    app.setSessionToken(responsePayload)
+    window.location = '/checks/all'
+  }
+}
+
+// Get the session token from localstorage and set it in the app.config object
+app.getSessionToken = () => {
+  const tokenString = localStorage.getItem('token')
+
+  if (typeof tokenString === 'string') {
+    try {
+      const token = JSON.parse(tokenString)
+      app.config.sessionToken = token
+      if (typeof token === 'object') {
+        app.setLoggedInClass(true)
+      } else {
+        app.setLoggedInClass(false)
+      }
+    } catch(e){
+      app.config.sessionToken = false
+      app.setLoggedInClass(false)
+    }
+  }
+}
+
+// Set (or remove) the loggedIn class from the body
+app.setLoggedInClass = add => {
+  const target = document.querySelector("body");
+  add ? target.classList.add('loggedIn') : target.classList.remove('loggedIn')
+}
+
+// Set the session token in the app.config object as well as localstorage
+app.setSessionToken = (token) => {
+  app.config.sessionToken = token
+
+  if (token && typeof token === 'object' && token.id) {
+    tokenString = JSON.stringify(token)
+    localStorage.setItem('token', tokenString)
+    app.setLoggedInClass(true)
+  } else {
+    localStorage.removeItem('token')
+    app.setLoggedInClass(false)
+  }
+}
+
+
+// Renew the token
+app.renewToken = callback => {
+  const currentToken = typeof app.config.sessionToken === 'object' ? app.config.sessionToken : false
+  if (!currentToken) {
+    app.setSessionToken(false)
+    callback(true)
+  }
+
+  // Update the token with a new expiration
+  const payload = {
+    id : currentToken.id,
+    extend : true,
+  }
+
+  app.client.request({
+    url: '/api/tokens',
+    method: 'PUT',
+    data: payload,
+    success: (statusCode, response) => {
+      const responsePayload = response.data
+      // Update the token data in the app
+      app.setSessionToken(responsePayload)
+      callback(false)
+    },
+    error: () => {
+      app.setSessionToken(false)
+      callback(true)
+    }
+  })
+}
+
+// Loop to renew token often
+app.tokenRenewalLoop = () => {
+  setInterval(() => {
+    app.renewToken(err => {
+      if (err) return log.red("Error renewing token @ " + Date.now())
+      log.green("Token renewed successfully @ " + Date.now())
+    })
+  }, 1000 * 60) // once a minute minute
+}
+
+// Init (bootstrapping)
+app.init = function(){
+  log.magenta('App Initialized!')
+  // Bind all form submissions
+  app.bindForms()
+
+  // Get the token from localstorage
+  app.getSessionToken()
+
+  // Bind logout button
+  app.bindLogoutButton()
+
+  // Renew token
+  app.tokenRenewalLoop()
+}
+
+// Call the init processes after the window loads
+window.onload = function(){
+  app.init()
 }
