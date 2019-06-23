@@ -85,6 +85,33 @@ handlers.accountCreate = (data, callback) => {
   })
 }
 
+// Account edit handler
+handlers.accountEdit = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Account Settings',
+    'body.class': 'accountEdit',
+  }
+
+  // Read in a template as a string
+  getTemplate('accountEdit', templateData, (err, contentHTML) => {
+    if (err || !contentHTML) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(contentHTML, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
 // Create session handler
 handlers.sessionCreate = (data, callback) => {
   if (data.method !== 'get') {

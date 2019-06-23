@@ -21,7 +21,7 @@ server.router = {
   ping: handlers.ping,
   '': handlers.index,
   'account/create': handlers.accountCreate,
-  'account/edit': handlers.accountCreate,
+  'account/edit': handlers.accountEdit,
   'account/deleted': handlers.accountDeleted,
   'session/create': handlers.sessionCreate,
   'session/deleted': handlers.sessionDeleted,
