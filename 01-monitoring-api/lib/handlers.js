@@ -196,6 +196,87 @@ handlers.sessionDeleted = (data, callback) => {
   })
 }
 
+// Create a new check
+handlers.checksCreate = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Create a New Check',
+    'body.class': 'checksCreate',
+  }
+
+  // Read in a template as a string
+  getTemplate('checksCreate', templateData, (err, contentHTML) => {
+    if (err || !contentHTML) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(contentHTML, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
+// Checks dashboard (checks list)
+handlers.checksList = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Dashboard',
+    'body.class': 'checksList',
+  }
+
+  // Read in a template as a string
+  getTemplate('checksList', templateData, (err, contentHTML) => {
+    if (err || !contentHTML) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(contentHTML, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
+// Checks dashboard (checks list)
+handlers.checksEdit = (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Check Details',
+    'body.class': 'checksEdit',
+  }
+
+  // Read in a template as a string
+  getTemplate('checksEdit', templateData, (err, contentHTML) => {
+    if (err || !contentHTML) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(contentHTML, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
 // Favicon handler
 handlers.favicon = (data, callback) => {
   if (data.method !== 'get') {

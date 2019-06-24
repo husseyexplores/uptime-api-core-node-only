@@ -5,7 +5,7 @@
 const log = {
   green: (...args) => args.forEach(arg => typeof arg === 'string' ? console.log('%c' + arg, 'display: inline-block; font-weight: 700; letter-spacing: 2px; padding: 6px 12px; background: #73e09e; color: #025021;') : console.log(arg)),
 
-  red: (...args) => args.forEach(arg => typeof arg === 'string' ? console.log('%c' + arg, 'display: inline-block; font-weight: 700; letter-spacing: 2px; padding: 6px 12px; background: pink; color: #fff;') : console.log(arg)),
+  red: (...args) => args.forEach(arg => typeof arg === 'string' ? console.log('%c' + arg, 'display: inline-block; font-weight: 700; letter-spacing: 2px; padding: 6px 12px; background: pink; color: #890000;') : console.log(arg)),
 
   magenta: (...args) => args.forEach(arg => typeof arg === 'string' ? console.log('%c' + arg, 'display: inline-block; font-weight: 700; letter-spacing: 2px; padding: 6px 12px; background: #9f049d; color: #fff;') : console.log(arg)),
 }
@@ -103,12 +103,13 @@ app.logUserOut = (redirectUser, callback) => {
       if (typeof redirectUser === 'string') {
         window.location = '/session/deleted'
       } else if (typeof redirectUser === 'boolean' && !redirectUser) {
-        callback()
+        callback(true)
       }
     },
     error: (statusCode, response) => {
       log.red('Error logging out. Got the following response: ')
       console.log(response)
+      callback(false)
     }
   })
 }
@@ -147,18 +148,49 @@ app.bindForms = () => {
       const payload = {}
       const elements = this.elements
       for (let i = 0; i < elements.length; i++) {
-        if (elements[i].type !== 'submit') {
-          const valueOfElement = elements[i].type == 'checkbox' ? elements[i].checked : elements[i].value
-          if (elements[i].name == '_method') {
-            method = valueOfElement
+        const el = elements[i]
+        if (el.type === 'submit') continue
+
+        // Determine class of element and set value accordingly
+        const { classList, type, checked } = el
+        let { value, name } = el
+        const classOfElement = typeof classList.value === 'string'
+          && classList.value.length > 0
+          ? classList.value : ''
+
+        value = type === 'checkbox' && classOfElement.indexOf('multiselect') === -1
+        ? checked
+        : classOfElement.indexOf('intval') === -1
+        ? value : parseInt(value, 10)
+
+        // Override the method of the form if the input's name is _method
+        if (name === '_method') {
+          method = value
+        } else {
+          // Create an payload field named "method" if the elements name is actually httpmethod
+          if(name === 'httpmethod'){
+            name = 'method'
+          }
+
+          // Create an payload field named 'id' if the elements name is actually uid
+          if (name === 'uid'){
+            name = 'id'
+          }
+
+          // If the element has the class "multiselect" add its value(s) as array elements
+          if (classOfElement.indexOf('multiselect') > -1) {
+            if (checked) {
+              payload[name] = payload[name] instanceof Array ? payload[name] : []
+              payload[name].push(value)
+            }
           } else {
-            payload[elements[i].name] = valueOfElement
+            payload[name] = value
           }
         }
       }
 
-      // If the method is DELETE, the payload should be a queryStringObject instead
-      const queryString = method === 'DELETE'? payload : {}
+      // If the method is DELETE, the queryString should be the payload object instead
+      const queryString = method === 'DELETE' ? payload : {}
 
       // Call the API
       app.client.request({
@@ -226,21 +258,149 @@ app.formResponseProcessor = (formId, requestPayload, responsePayload) =>{
   }
 
   // If login was successful, set the token in localstorage and redirect the user
-  if(formId === 'sessionCreate'){
+  if(formId === 'sessionCreate') {
     app.setSessionToken(responsePayload)
     window.location = '/checks/all'
   }
 
   // If forms saved successfully and they have success messages, show them
-  const formsWithSuccessMessages = ['accountEdit1', 'accountEdit2']
+  const formsWithSuccessMessages = ['accountEdit1', 'accountEdit2', 'checksEdit1']
   if (formsWithSuccessMessages.indexOf(formId) !== -1) {
     document.querySelector(`#${formId} .formSuccess`).style.display = 'block'
   }
 
-    // If the user just deleted their account, redirect them to the account-delete page
-  if(formId == 'accountEdit3'){
-    app.logUserOut('/account/deleted');
+  // If the user just deleted their account, redirect them to the account-delete page
+  if (formId === 'accountEdit3') {
+    return app.logUserOut('/account/deleted');
   }
+
+  // If the user just created a new check successfully, redirect back to the dashboard
+  if (formId === 'checksCreate') {
+    return window.location = '/checks/all';
+  }
+
+  // If the user just deleted a check, redirect them to the dashboard
+  if (formId === 'checksEdit2') {
+    return window.location = '/checks/all';
+  }
+}
+
+// Load the dashboard page data - all user checks
+app.loadChecksListPage = () => {
+  // Get the phone number from the current token, or log the user out if none is there
+  const { sessionToken : token } = app.config
+  const phone = token && typeof token.phone  === 'string' ? token.phone : null
+  if (!phone) return app.logUserOut()
+
+  // Fetch the user data
+  app.client.request({
+    url: '/api/users',
+    method: 'GET',
+    qs: { phone },
+    error: () => {
+      // log the user out (assuming that the api is temporarily down or the users token is bad)
+      app.logUserOut()
+    },
+    success: (statusCode, response) => {
+      const responsePayload = response.data
+      // Determine how many checks the user has
+      const allChecks = typeof responsePayload.checks === 'object' && responsePayload.checks instanceof Array && responsePayload.checks.length > 0 ? responsePayload.checks : [];
+
+      if(allChecks.length === 0) {
+        // Show 'you have no checks' message
+        document.getElementById('noChecksMessage').style.display = 'table-row';
+
+        // Show the createCheck CTA
+        document.getElementById('createCheckCTA').style.display = 'block';
+        return
+      }
+
+      if (allChecks.length < 5){
+        // Show the createCheck CTA
+        document.getElementById('createCheckCTA').style.display = 'block'
+      } else {
+        document.getElementById('createCheckCTA').style.display = 'none'
+      }
+
+      // Show each created check as a new row in the table
+      allChecks.forEach(checkId => {
+        // Get the data for the check
+        app.client.request({
+          url: 'api/checks',
+          method: 'GET',
+          qs: { id: checkId },
+          error: () => { log.red(`Error trying to load check ID: ${checkId}`) },
+          success: (statusCode, response) => {
+            const check = response.data
+            // Make the check data into a table row
+            const table = document.getElementById('checksListTable')
+            const tr = table.insertRow(-1)
+            tr.classList.add('checkRow')
+            const td0 = tr.insertCell(0)
+            const td1 = tr.insertCell(1)
+            const td2 = tr.insertCell(2)
+            const td3 = tr.insertCell(3)
+            const td4 = tr.insertCell(4)
+            td0.innerHTML = check.url
+            td1.innerHTML = check.protocol + '://'
+            td2.innerHTML = check.method.toUpperCase()
+            const state = typeof check.state === 'string' ? check.state : 'unknown'
+            td3.innerHTML = state
+            td4.innerHTML = `<a href="/checks/edit?id=${check.id}">View / Edit / Delete</a>`
+          }
+        })
+      })
+    }
+  })
+}
+
+// Load the checks edit page specifically
+app.loadChecksEditPage = () => {
+  const queryString = {};
+  window.location.href.split(/\?|&/).slice(1).forEach(rawQs => {
+    if (rawQs.indexOf('=') === -1) return
+    const [name, value] = rawQs.split('=')
+    queryString[name] = value
+  })
+
+  if (!queryString.id){
+    return (window.location = '/checks/all')
+  }
+
+  app.client.request({
+    url: '/api/checks',
+    method: 'GET',
+    qs: { id: queryString.id },
+    error: () => {
+      // If the request comes back as something other than 200, redirect back to dashboard
+      window.location = '/checks/all';
+    },
+    success: (statusCode, response) => {
+      const responsePayload = response.data
+      // Put the hidden id field into both forms
+      const hiddenIdInputs = document.querySelectorAll('input.hiddenIdInput')
+      for (let i = 0; i < hiddenIdInputs.length; i++) {
+        hiddenIdInputs[i].value = responsePayload.id
+      }
+
+      const state = responsePayload.state ? responsePayload.state : 'unknown'
+
+      // Put the data into the top form as values where needed
+      document.querySelector('#checksEdit1 .displayIdInput').value = responsePayload.id
+      document.querySelector('#checksEdit1 .displayStateInput').value = state
+      document.querySelector('#checksEdit1 .protocolInput').value = responsePayload.protocol
+      document.querySelector('#checksEdit1 .urlInput').value = responsePayload.url
+      document.querySelector('#checksEdit1 .methodInput').value = responsePayload.method
+      document.querySelector('#checksEdit1 .timeoutInput').value = responsePayload.timeoutSeconds
+      const successCodeCheckboxes = document.querySelectorAll('#checksEdit1 input.successCodesInput')
+
+      for (let i = 0; i < successCodeCheckboxes.length; i++) {
+        if (responsePayload.successCodes.indexOf(parseInt(successCodeCheckboxes[i].value)) > -1) {
+          successCodeCheckboxes[i].checked = true
+        }
+      }
+    },
+  })
 }
 
 // Get the session token from localstorage and set it in the app.config object
@@ -288,7 +448,7 @@ app.renewToken = callback => {
   const currentToken = typeof app.config.sessionToken === 'object' ? app.config.sessionToken : false
   if (!currentToken) {
     app.setSessionToken(false)
-    callback(true)
+    return callback(true)
   }
 
   // Update the token with a new expiration
@@ -333,6 +493,16 @@ app.loadDataOnPage = () => {
   // Logic for account settings page
   if (primaryClass === 'accountEdit') {
     app.loadAccountEditPage()
+  }
+
+  // Logic for dashboard page
+  if(primaryClass == 'checksList'){
+    app.loadChecksListPage();
+  }
+
+  // Logic for check details page
+  if(primaryClass == 'checksEdit'){
+    app.loadChecksEditPage();
   }
 }
 
