@@ -112,6 +112,34 @@ handlers.accountEdit = (data, callback) => {
   })
 }
 
+// Account has been deleted
+handlers.accountDeleted =  (data, callback) => {
+  if (data.method !== 'get') {
+    return callback(405, undefined, 'html')
+  }
+
+  // Prepare data for interpolation
+  const templateData = {
+    'head.title': 'Account Deleted',
+    'head.description': 'Your account has been deleted.',
+    'body.class': 'accountDeleted',
+  }
+
+  // Read in a template as a string
+  getTemplate('accountDeleted', templateData, (err, contentHTML) => {
+    if (err || !contentHTML) {
+      return callback(500, undefined, 'html')
+    }
+    // Add the universal header and footer
+    addPartialTemplates(contentHTML, templateData, (err, fullPageHTML) => {
+      if (err || !fullPageHTML) return callback(500, '<p>Internal Server Error</p>', 'html')
+
+      // Return the final html back to the requester
+      callback(200, fullPageHTML, 'html')
+    })
+  })
+}
+
 // Create session handler
 handlers.sessionCreate = (data, callback) => {
   if (data.method !== 'get') {
@@ -451,7 +479,7 @@ _users.delete = (data, callback) => {
 
         // If there are no checks
         if (!userChecks || (isArray(userChecks) && !hasLength(userChecks))) {
-          callback(200, { _status: 200 , _message: 'User successfully deleted.' })
+          return callback(200, { _status: 200 , _message: 'User successfully deleted.' })
         }
 
         const totalChecksToDelete = userChecks.length

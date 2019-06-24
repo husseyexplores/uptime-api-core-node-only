@@ -80,7 +80,12 @@ app.client.request = ({ headers, url, method, qs, data, success, error } = {}) =
 }
 
 // Log out the user then redirect them
-app.logUserOut = () => {
+app.logUserOut = (redirectUser, callback) => {
+  redirectUser = typeof redirectUser === 'string' || typeof redirectUser === 'boolean'
+    ? redirectUser
+    : '/session/deleted'
+  callback = typeof callback === 'function' ? callback : () => {}
+
   // Get the current token id
   const { sessionToken: token } = app.config
   const tokenId = token && typeof token.id === 'string' && token.id
@@ -95,7 +100,15 @@ app.logUserOut = () => {
       app.setSessionToken(false)
 
       // Send the user to the logged out page,
-      window.location = '/session/deleted'
+      if (typeof redirectUser === 'string') {
+        window.location = '/session/deleted'
+      } else if (typeof redirectUser === 'boolean' && !redirectUser) {
+        callback()
+      }
+    },
+    error: (statusCode, response) => {
+      log.red('Error logging out. Got the following response: ')
+      console.log(response)
     }
   })
 }
@@ -144,17 +157,26 @@ app.bindForms = () => {
         }
       }
 
+      // If the method is DELETE, the payload should be a queryStringObject instead
+      const queryString = method === 'DELETE'? payload : {}
+
       // Call the API
       app.client.request({
         url: path,
         method,
         data: payload,
+        qs: queryString,
         success: (statusCode, response) => {
           const responsePayload = response.data
           // If successful, send to form response processor
           app.formResponseProcessor(formId,payload,responsePayload);
         },
         error: (statusCode, response) => {
+          if (statusCode === 403) {
+            // Unauthorized access - log the user out
+            return app.logUserOut()
+          }
+
           // Try to get the error from the api, or set a default error message
           var error = typeof(response._error) == 'string' ? response._error : 'An error has occured, please try again';
 
@@ -213,6 +235,11 @@ app.formResponseProcessor = (formId, requestPayload, responsePayload) =>{
   const formsWithSuccessMessages = ['accountEdit1', 'accountEdit2']
   if (formsWithSuccessMessages.indexOf(formId) !== -1) {
     document.querySelector(`#${formId} .formSuccess`).style.display = 'block'
+  }
+
+    // If the user just deleted their account, redirect them to the account-delete page
+  if(formId == 'accountEdit3'){
+    app.logUserOut('/account/deleted');
   }
 }
 
