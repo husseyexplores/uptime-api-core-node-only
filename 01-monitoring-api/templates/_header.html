@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- General settings -->
+  <meta charset="UTF-8">
+  <meta http-equiv="content-language" content="en-us">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <base href="{global.baseUrl}" />
+
+  <!-- Meta tags -->
+  <title>{head.title} | {global.appName}</title>
+  <meta name="description" content="{head.description}">
+
+  <!-- Static assetets -->
+  <link type="image/x-icon" rel="icon" href="favicon.ico">
+  <script type="text/javascript" charset="utf-8" src="public/app.js"></script>
+  <link rel="stylesheet" type="text/css" href="public/app.css">
+</head>
+<body class="{body.class}">
+  <!-- Page wrapper -->
+  <div class="wrapper">
+    <header class="header">
+      <!-- Logo -->
+      <a href="/" class="logo">
+        <img src="public/logo.png" alt="Logo">
+      </a>
+
+      <!-- Navigation -->
+      <ul class="menu">
+        <li><a href="/">Home</a></li>
+        <li class="loggedOut"><a href="/account/create">Signup</a></li>
+        <li class="loggedOut"><a href="/session/create">Login</a></li>
+        <li class="loggedIn"><a href="/checks/all">Dashboard</a></li>
+        <li class="loggedIn"><a href="/account/edit">Account Settings</a></li>
+        <li class="loggedIn"><a href="#" id="logoutButton">Logout</a></li>
+      </ul>
+    </header>
+
+    <!-- Page specific content -->
+    <div class="content">
