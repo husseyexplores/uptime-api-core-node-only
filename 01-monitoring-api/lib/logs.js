@@ -44,17 +44,16 @@ logs.list = (includeCompressedLogs, callback) => {
     if (err || !data) {
       return callback(err, data)
     }
+    const fileNames = []
 
-    const fileNames = data.filter(name => {
+    data.forEach(name => {
       if (name.includes('.log')) {
-        return name.replace('.log', '')
+        return fileNames.push(name.replace('.log', ''))
       }
 
-      if (name.includes('.gz.b64')) {
-        return name.replace('.gz.b64', '')
+      if (name.includes('.gz.b64') && includeCompressedLogs) {
+        return fileNames.push(name.replace('.gz.b64', ''))
       }
-
-      return false
     })
 
     callback(null, fileNames)
