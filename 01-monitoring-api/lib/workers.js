@@ -161,6 +161,7 @@ workers.processCheckOutcome = (data, checkOutcome) => {
   // Update the check data
   const newCheckData = data
   newCheckData.state = state
+  newCheckData.lastStatus = checkOutcome.responseCode
   newCheckData.lastChecked = timeOfCheck
 
   // Save the updates
@@ -252,17 +253,17 @@ workers.logRotationLoop = () => setInterval(workers.rotateLogs, 1000 * 60 * 60 *
 workers.init = () => {
   console.log('\x1b[33m%s\x1b[0m', 'Background workers have been started.')
 
-  // // Execute all the checks immediately once the app starts
-  // workers.gatherAllChecks()
+  // Execute all the checks immediately once the app starts
+  workers.gatherAllChecks()
 
-  // // Call the loop so the checks will execute late on
-  // workers.loop()
+  // Call the loop so the checks will execute late on
+  workers.loop()
 
-  // // Comppress all the logs immediately
-  // workers.rotateLogs()
+  // Comppress all the logs immediately
+  workers.rotateLogs()
 
-  // // Call the compression loop so the logs will be compress later on
-  // workers.logRotationLoop()
+  // Call the compression loop so the logs will be compress later on
+  workers.logRotationLoop()
 }
 
 module.exports = workers
