@@ -6,6 +6,11 @@
 const events = require('events')
 const readline = require('readline')
 const util = require('util')
+const os = require('os')
+const v8 = require('v8')
+
+const dataLib = require('./data')
+const logsLib = require('./logs')
 
 const debug = util.debuglog('cli')
 
@@ -13,6 +18,77 @@ const debug = util.debuglog('cli')
 
 class EventEmiiter extends events {}
 const e = new EventEmiiter()
+
+// Helpers
+const vertivalSpace = (n = 1) => {
+  if (!Number.isInteger(n)) n = 1
+  for (let i = 0; i < n; i++) {
+    console.log('')
+  }
+}
+
+const horizontalLine = () => {
+  // Get the available screen size
+  const width = process.stdout.columns
+  let line = ''
+  for (let i = 0; i < width; i++) {
+    line += '#'
+  }
+  console.log(line)
+}
+
+const centered = str => {
+  str = typeof str !== 'string' ? String(str.trim()) : str.trim()
+  const width = process.stdout.columns
+
+  // calculate the left padding there should be
+  const paddingOnEachSide = Math.floor((width - str.length) / 2)
+  const spaces = ' '.repeat(paddingOnEachSide)
+
+  // Put in left padded spaced before the string, then add the string
+  const line = spaces + str
+  console.log(line)
+}
+
+const percent = (value, total) => Math.round((value / total) * 100)
+
+const formatTime = seconds => {
+  const pad = n => (n < 10 ? '0' : '') + n
+  const hours = Math.floor(seconds / (60 * 60))
+  const minutes = Math.floor(seconds % (60 * 60) / 60)
+  seconds = Math.floor(seconds % 60)
+  return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds)
+}
+
+/*
+ * Reference: https://ourcodeworld.com/articles/read/112/how-to-pretty-print-beautify-a-json-string
+*/
+const jsonHightlight = json => {
+  const resetColor = '\x1b[0m'
+  const yellow = '\x1b[33m'
+  const magenta = '\x1b[35m'
+  const cyan = '\x1b[36m'
+  const red = '\x1b[31m'
+  const green = '\x1b[32m'
+
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+      let color = yellow;
+      if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+              color = red;
+          } else {
+              color = green;
+          }
+      } else if (/true|false/.test(match)) {
+          color = cyan;
+      } else if (/null/.test(match)) {
+          color = magenta;
+      }
+      return color + match + resetColor;
+  });
+}
+
+const yellow = str => `\x1b[33m${str}\x1b[0m`
 
 const cli = {}
 
@@ -36,47 +112,233 @@ cli.bindValidQueryListeners = () => {
 
 // help / man
 cli.responders.help = () => {
-  console.log('You asked for help!')
+  const commands = {
+    exit: 'Kill the CLI (and the rest of the application)',
+    man: 'Show this help page',
+    help: 'Alias of the "man" command',
+    stats: 'Get statistics of the underlying operating system and resource utilization',
+    'list users': 'Show a list of all the registered (undeleted) users in the app',
+    'more user info --{userId}': 'Show details of a specific user',
+    'list checks --up --down': 'Show a list of all the active checks in the app, including their state. The "--up" and "--down" flags are both optional. ',
+    'more check info --{checkId}': 'Show details of a specific check',
+    'list logs': 'Show a list of all the log files available to be read (compressed only)',
+    'more log info --{logFileName}': 'Show details of a specific log file',
+  }
+
+  // Show a header for the 'man' page that is as wide as the screen
+  horizontalLine()
+  centered('CLI MANUAL')
+  horizontalLine()
+  vertivalSpace(2)
+
+  // Show each command, followed by its explanation, in white and yellow respectively
+  for (const key in commands) {
+    if (!commands.hasOwnProperty(key)) continue
+    const value = commands[key]
+    let line = `\x1b[33m${key}\x1b[0m`
+    const padding = 40 - line.length
+    for (let i = 0; i < padding; i++) {
+      line += ' '
+    }
+    line += value
+    console.log(line)
+    vertivalSpace()
+  }
+
+  vertivalSpace()
+  horizontalLine()
 }
 
 // exit
 cli.responders.exit = () => {
-  console.log('You asked for exit!')
+  process.exit(0)
 }
 
 // stats
 cli.responders.stats = () => {
-  console.log('You asked for stats!')
+  // Compile and object of stats
+  const freeMemoryInBytes = os.freemem()
+  const freeMemoryInMBs = (freeMemoryInBytes / 1e+6).toFixed(2)
+  const freeMemoryInGBs = (freeMemoryInBytes / 1e+9).toFixed(2)
+  const totalMemoryInBytes = os.totalmem()
+  const totalMemoryInMBs = (totalMemoryInBytes / 1e+6).toFixed(2)
+  const totalMemoryInGBs = (totalMemoryInBytes / 1e+9).toFixed(2)
+  const heapStats = v8.getHeapStatistics()
+
+  const stats = {
+    'Load Average': os.loadavg().join(' '),
+    'CPU Count': os.cpus().length,
+    'Total Memory': `${totalMemoryInMBs} Megabytes / ${totalMemoryInGBs} Gigabytes`,
+    'Free Memory': `${freeMemoryInMBs} Megabytes / ${freeMemoryInGBs} Gigabytes`,
+    'Current Malloced Memory': heapStats.malloced_memory,
+    'Peak Malloced Memory': heapStats.peak_malloced_memory,
+    'Active Native Contexts': heapStats.number_of_native_contexts + ' (Increase of this over time indicates a memory leak. See NodeJS v8 docs for more.)',
+    'Detached Contexts': heapStats.number_of_detached_contexts + ' (This number being non-zero indicates a potential memory leak. See NodeJS v8 docs for more.)',
+    'Allocated Heap Used (%)': percent(heapStats.used_heap_size, heapStats.total_heap_size) + '%',
+    'Available Heap Allocated (%)': percent(heapStats.total_heap_size, heapStats.heap_size_limit) + '%',
+    'System Uptime': formatTime(os.uptime()) + ' HH:MM:SS',
+    'App Uptime': formatTime(process.uptime()) + ' HH:MM:SS',
+  }
+
+  // Show a header for the 'Stats' page that is as wide as the screen
+  horizontalLine()
+  centered('SYSTEM STATS')
+  horizontalLine()
+  vertivalSpace(2)
+
+  console.log(heapStats)
+
+  // Log out each stat
+  for (const key in stats) {
+    if (!stats.hasOwnProperty(key)) continue
+    const value = stats[key]
+    let line = `\x1b[33m${key}\x1b[0m`
+    const padding = 40 - line.length
+    for (let i = 0; i < padding; i++) {
+      line += ' '
+    }
+    line += value
+    console.log(line)
+    vertivalSpace()
+  }
+
+  vertivalSpace()
+  horizontalLine()
 }
 
 // list users
 cli.responders.listUsers = () => {
-  console.log('You asked for list users!')
+  dataLib.list('users', (err, list) => {
+    if (err || !list || !list.length) return console.log('Oops, an error occured while getting users.')
+    vertivalSpace()
+    list.forEach(userId => {
+      dataLib.read('users', userId, (err, userData) => {
+        if (err || !userData) return console.log('Oops, an error occured while getting users.')
+        const numberOfChecks = Array.isArray(userData.checks) ? userData.checks.length : 0
+        let name = `${yellow('Name')}: ${userData.firstName} ${userData.lastName}`
+        let phone = `${yellow('Phone')}: ${userData.phone}`
+        let regChecks = `${yellow('Registered Checks')}: ${numberOfChecks}`
+
+        // Pad phone, and regChecks in the correct order
+        phone = phone.padStart(phone.length + (40 - name.length), ' ')
+        regChecks = regChecks.padStart(phone.length + (40 - phone.length), ' ')
+        const line = name + phone + regChecks
+
+        console.log(line)
+      })
+    })
+  })
 }
 
 // user details
-cli.responders.userDetails = () => {
-  console.log('You asked for user info!')
+cli.responders.userDetails = input => {
+  const userId = input.split('--')[1]
+  if (!userId) return console.log('Please specify a user ID')
+
+  dataLib.read('users', userId, (err, userData) => {
+    if (err || !userData) return console.log('User not found.')
+    delete userData.hashedPassword
+
+    // Print the JSON text with highlighting
+    vertivalSpace()
+    const json = JSON.stringify(userData, null, 2)
+
+    console.log(jsonHightlight(json))
+    vertivalSpace()
+  })
 }
 
 // list checks
-cli.responders.listChecks = () => {
-  console.log('You asked for list checks!')
+cli.responders.listChecks = input => {
+  const statesArr = input.toLowerCase().split('--').slice(1)
+  const filteredStates = {}
+  statesArr
+  .filter(state => state === 'up' || state === 'down')
+  .forEach(state => (filteredStates[state] = true))
+
+  // If no state is defind, default to show both
+  if (!filteredStates.down && !filteredStates.up) {
+    filteredStates.up = true
+    filteredStates.down = true
+  }
+
+  dataLib.list('checks', (err, list) => {
+    if (err || !list || !list.length) return console.log('Oops, an error occured while getting checks.')
+    vertivalSpace()
+    list.forEach(checkId => {
+      dataLib.read('checks', checkId, (err, data) => {
+        if (err || !data) return console.log('Oops, an error occured while getting the check.')
+        let includeCheck = false
+        let line = ''
+
+        // Get the state, default to 'down'
+        let state = data.state ? data.state : 'down'
+
+        // Get the state, default to 'unknown'
+        let stateOrUnknown = data.state ? state : 'unknown'
+
+        if (filteredStates[state]) {
+          line += `${yellow('ID')}: ${data.id}`
+          line += ` | ${yellow('State')}: ${stateOrUnknown}`
+          line += ` | ${yellow('Protocol')}: ${data.protocol}`
+          line += ` | ${yellow('Method')}: ${data.method}`
+          line += ` | ${yellow('URL')}: ${data.url}`
+          line += ` | ${yellow('Last Checked')}: ${new Date(data.lastChecked) || 'unknown'}`
+
+          console.log(line)
+        }
+      })
+    })
+  })
 }
 
 // check details
-cli.responders.checkDetails = () => {
-  console.log('You asked for check info!')
+cli.responders.checkDetails = input => {
+  const checkId = input.split('--')[1]
+  if (!checkId) return console.log('Please specify a check ID')
+
+  dataLib.read('checks', checkId, (err, checkData) => {
+    if (err || !checkData) return console.log('Check not found.')
+
+    // Print the JSON text with highlighting
+    vertivalSpace()
+    const json = JSON.stringify(checkData, null, 2)
+
+    console.log(jsonHightlight(json))
+    vertivalSpace()
+  })
 }
 
 // list logs
 cli.responders.listLogs = () => {
-  console.log('You asked for list logs!')
+  logsLib.list(true, (err, logFileNames) => {
+    if (err || !logFileNames) return console.log('Error reading logs')
+    if (!logFileNames.length) return console.log('No logs to show!')
+
+    logFileNames.forEach(filename => {
+      if (!filename.includes('-')) return
+      console.log(filename)
+    })
+  })
 }
 
 // log details
-cli.responders.logDetails = () => {
-  console.log('You asked for log info!')
+cli.responders.logDetails = input => {
+  const logFileId = input.split('--')[1]
+  if (!logFileId) return console.log('Please specify a user ID')
+
+  logsLib.decompress(logFileId, (err, stringData) => {
+    if (err || !stringData) return console.log('Log file not found.')
+    // Split into lines
+    const arr = stringData.split('\n')
+    arr.forEach(jsonString => {
+      try {
+        const json = JSON.stringify(JSON.parse(jsonString), null, 2)
+        console.log(jsonHightlight(json))
+        horizontalLine()
+      } catch (error) {}
+    })
+  })
 }
 
 // Input processor
