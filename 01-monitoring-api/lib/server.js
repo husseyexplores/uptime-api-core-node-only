@@ -34,6 +34,7 @@ server.router = {
   'api/checks': handlers.checks,
   'favicon.ico': handlers.favicon,
   'public': handlers.public,
+  'examples/error': handlers.exampleError,
 }
 
 server.httpsServerOptions = {
@@ -96,62 +97,71 @@ server.requestHandler = (req, res) => {
       handler = (typeof(router[trimmedPath] === 'function') && router[trimmedPath]) || router.notFound
     }
 
-    handler(data, (statusCode, payload, contentType) => {
-      // **This is a payload that is sent to the user**
-      // sane defaults
-      statusCode = typeof(statusCode) === 'number' ? statusCode : 200
-      contentType = contentType || 'json'
-
-      // set the response-parts that are content-specific
-      switch (contentType) {
-        case 'json':
-          payload = JSON.stringify(isObject(payload) ? payload : {})
-          res.setHeader('Content-Type', 'application/json')
-          break
-
-        case 'html':
-          res.setHeader('Content-Type', 'text/html')
-          break
-
-        case 'favicon':
-          res.setHeader('Content-Type', 'image/x-icon')
-          break
-
-        case 'css':
-          res.setHeader('Content-Type', 'text/css')
-          break
-
-        case 'js':
-          res.setHeader('Content-Type', 'text/javascript')
-          break
-
-        case 'png':
-          res.setHeader('Content-Type', 'image/png')
-          break
-
-        case 'jpg':
-          res.setHeader('Content-Type', 'image/jpeg')
-          break
-
-        default:
-          payload = isString(payload) ? payload : ''
-          res.setHeader('Content-Type', 'text/plain')
-      }
-
-      // set the response-parts that are common to all content types
-      res.writeHead(statusCode)
-      res.end(payload)
-
-      // if (trimmedPath === 'favicon.ico') return
-
-      // If the response is 200, print in green, otherwise print red
-      if (statusCode === 200) {
-        debug('\x1b[32m%s\x1b[0m', `${method.toUpperCase()} | ${trimmedPath} | ${statusCode}`) // green
-      } else {
-        debug('\x1b[31m%s\x1b[0m', `${method.toUpperCase()} | ${trimmedPath} | ${statusCode}`) // red
-      }
-    })
+    try {
+      handler(data, (statusCode, payload, contentType) => {
+        server.processHandlerResponse(res, method, trimmedPath, statusCode, payload, contentType)
+      })
+    } catch (e) {
+      debug(e)
+      server.processHandlerResponse(res, method, trimmedPath, 500, { _status: 500, _error: 'An unkown error has occured.'}, 'json')
+    }
   })
+}
+
+server.processHandlerResponse = (res, method, trimmedPath, statusCode, payload, contentType) => {
+  // **This is a payload that is sent to the user**
+  // sane defaults
+  statusCode = typeof(statusCode) === 'number' ? statusCode : 200
+  contentType = contentType || 'json'
+
+  // set the response-parts that are content-specific
+  switch (contentType) {
+    case 'json':
+      payload = JSON.stringify(isObject(payload) ? payload : {})
+      res.setHeader('Content-Type', 'application/json')
+      break
+
+    case 'html':
+      res.setHeader('Content-Type', 'text/html')
+      break
+
+    case 'favicon':
+      res.setHeader('Content-Type', 'image/x-icon')
+      break
+
+    case 'css':
+      res.setHeader('Content-Type', 'text/css')
+      break
+
+    case 'js':
+      res.setHeader('Content-Type', 'text/javascript')
+      break
+
+    case 'png':
+      res.setHeader('Content-Type', 'image/png')
+      break
+
+    case 'jpg':
+      res.setHeader('Content-Type', 'image/jpeg')
+      break
+
+    default:
+      payload = isString(payload) ? payload : ''
+      res.setHeader('Content-Type', 'text/plain')
+  }
+
+  // set the response-parts that are common to all content types
+  res.writeHead(statusCode)
+  res.end(payload)
+
+  // if (trimmedPath === 'favicon.ico') return
+
+  // If the response is 200, print in green, otherwise print red
+  if (statusCode === 200) {
+    debug('\x1b[32m%s\x1b[0m', `${method.toUpperCase()} | ${trimmedPath} | ${statusCode}`) // green
+  } else {
+    debug('\x1b[31m%s\x1b[0m', `${method.toUpperCase()} | ${trimmedPath} | ${statusCode}`) // red
+  }
 }
 
 server.httpServer = http.createServer(server.requestHandler)

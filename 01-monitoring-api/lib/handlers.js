@@ -348,7 +348,12 @@ handlers.public = (data, callback) => {
  *
  */
 
- handlers.ping = (data, callback) => {
+handlers.exampleError = (data, callback) => {
+  const err = new Error('This is an example error')
+  throw err
+}
+
+handlers.ping = (data, callback) => {
   // Callback a HTTP status code, and a payload object
   callback(200, { _status: 200 , _message: 'Server is up and running.' })
 }
