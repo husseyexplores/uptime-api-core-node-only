@@ -15,6 +15,51 @@ const { hashSalt, twilio, templateGlobals } = require('../config')
 
 const helpers = {}
 
+// Sample fn for testing
+helpers.getANumber = (n = 1) => n;
+
+
+// Helpers
+helpers.verticalSpace = (n = 1) => {
+  if (!Number.isInteger(n)) n = 1
+  for (let i = 0; i < n; i++) {
+    console.log('')
+  }
+}
+
+helpers.horizontalLine = () => {
+  // Get the available screen size
+  const width = process.stdout.columns
+  let line = ''
+  for (let i = 0; i < width; i++) {
+    line += '#'
+  }
+  console.log(line)
+}
+
+helpers.centered = str => {
+  str = typeof str !== 'string' ? String(str.trim()) : str.trim()
+  const width = process.stdout.columns
+
+  // calculate the left padding there should be
+  const paddingOnEachSide = Math.floor((width - str.length) / 2)
+  const spaces = ' '.repeat(paddingOnEachSide)
+
+  // Put in left padded spaced before the string, then add the string
+  const line = spaces + str
+  console.log(line)
+}
+
+helpers.percent = (value, total) => Math.round((value / total) * 100)
+
+helpers.formatTime = seconds => {
+  const pad = n => (n < 10 ? '0' : '') + n
+  const hours = Math.floor(seconds / (60 * 60))
+  const minutes = Math.floor(seconds % (60 * 60) / 60)
+  seconds = Math.floor(seconds % 60)
+  return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds)
+}
+
 // SHA256 hash
 helpers.hash = str => {
   if (typeof str !== 'string' || !str.length) return false

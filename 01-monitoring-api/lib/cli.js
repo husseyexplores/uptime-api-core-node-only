@@ -11,6 +11,7 @@ const v8 = require('v8')
 
 const dataLib = require('./data')
 const logsLib = require('./logs')
+const { verticalSpace, horizontalLine, centered, percent, formatTime } = require('./helpers')
 
 const debug = util.debuglog('cli')
 
@@ -18,47 +19,6 @@ const debug = util.debuglog('cli')
 
 class EventEmiiter extends events {}
 const e = new EventEmiiter()
-
-// Helpers
-const vertivalSpace = (n = 1) => {
-  if (!Number.isInteger(n)) n = 1
-  for (let i = 0; i < n; i++) {
-    console.log('')
-  }
-}
-
-const horizontalLine = () => {
-  // Get the available screen size
-  const width = process.stdout.columns
-  let line = ''
-  for (let i = 0; i < width; i++) {
-    line += '#'
-  }
-  console.log(line)
-}
-
-const centered = str => {
-  str = typeof str !== 'string' ? String(str.trim()) : str.trim()
-  const width = process.stdout.columns
-
-  // calculate the left padding there should be
-  const paddingOnEachSide = Math.floor((width - str.length) / 2)
-  const spaces = ' '.repeat(paddingOnEachSide)
-
-  // Put in left padded spaced before the string, then add the string
-  const line = spaces + str
-  console.log(line)
-}
-
-const percent = (value, total) => Math.round((value / total) * 100)
-
-const formatTime = seconds => {
-  const pad = n => (n < 10 ? '0' : '') + n
-  const hours = Math.floor(seconds / (60 * 60))
-  const minutes = Math.floor(seconds % (60 * 60) / 60)
-  seconds = Math.floor(seconds % 60)
-  return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds)
-}
 
 /*
  * Reference: https://ourcodeworld.com/articles/read/112/how-to-pretty-print-beautify-a-json-string
@@ -129,7 +89,7 @@ cli.responders.help = () => {
   horizontalLine()
   centered('CLI MANUAL')
   horizontalLine()
-  vertivalSpace(2)
+  verticalSpace(2)
 
   // Show each command, followed by its explanation, in white and yellow respectively
   for (const key in commands) {
@@ -142,10 +102,10 @@ cli.responders.help = () => {
     }
     line += value
     console.log(line)
-    vertivalSpace()
+    verticalSpace()
   }
 
-  vertivalSpace()
+  verticalSpace()
   horizontalLine()
 }
 
@@ -184,7 +144,7 @@ cli.responders.stats = () => {
   horizontalLine()
   centered('SYSTEM STATS')
   horizontalLine()
-  vertivalSpace(2)
+  verticalSpace(2)
 
   console.log(heapStats)
 
@@ -199,10 +159,10 @@ cli.responders.stats = () => {
     }
     line += value
     console.log(line)
-    vertivalSpace()
+    verticalSpace()
   }
 
-  vertivalSpace()
+  verticalSpace()
   horizontalLine()
 }
 
@@ -210,7 +170,7 @@ cli.responders.stats = () => {
 cli.responders.listUsers = () => {
   dataLib.list('users', (err, list) => {
     if (err || !list || !list.length) return console.log('Oops, an error occured while getting users.')
-    vertivalSpace()
+    verticalSpace()
     list.forEach(userId => {
       dataLib.read('users', userId, (err, userData) => {
         if (err || !userData) return console.log('Oops, an error occured while getting users.')
@@ -240,11 +200,11 @@ cli.responders.userDetails = input => {
     delete userData.hashedPassword
 
     // Print the JSON text with highlighting
-    vertivalSpace()
+    verticalSpace()
     const json = JSON.stringify(userData, null, 2)
 
     console.log(jsonHightlight(json))
-    vertivalSpace()
+    verticalSpace()
   })
 }
 
@@ -264,7 +224,7 @@ cli.responders.listChecks = input => {
 
   dataLib.list('checks', (err, list) => {
     if (err || !list || !list.length) return console.log('Oops, an error occured while getting checks.')
-    vertivalSpace()
+    verticalSpace()
     list.forEach(checkId => {
       dataLib.read('checks', checkId, (err, data) => {
         if (err || !data) return console.log('Oops, an error occured while getting the check.')
@@ -301,11 +261,11 @@ cli.responders.checkDetails = input => {
     if (err || !checkData) return console.log('Check not found.')
 
     // Print the JSON text with highlighting
-    vertivalSpace()
+    verticalSpace()
     const json = JSON.stringify(checkData, null, 2)
 
     console.log(jsonHightlight(json))
-    vertivalSpace()
+    verticalSpace()
   })
 }
 
