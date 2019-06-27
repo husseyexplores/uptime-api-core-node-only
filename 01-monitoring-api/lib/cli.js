@@ -11,7 +11,7 @@ const v8 = require('v8')
 
 const dataLib = require('./data')
 const logsLib = require('./logs')
-const { verticalSpace, horizontalLine, centered, percent, formatTime } = require('./helpers')
+const { verticalSpace, horizontalLine, centered, percent, formatTime, yellow, jsonHightlight } = require('./helpers')
 
 const debug = util.debuglog('cli')
 
@@ -23,32 +23,6 @@ const e = new EventEmiiter()
 /*
  * Reference: https://ourcodeworld.com/articles/read/112/how-to-pretty-print-beautify-a-json-string
 */
-const jsonHightlight = json => {
-  const resetColor = '\x1b[0m'
-  const yellow = '\x1b[33m'
-  const magenta = '\x1b[35m'
-  const cyan = '\x1b[36m'
-  const red = '\x1b[31m'
-  const green = '\x1b[32m'
-
-  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
-      let color = yellow;
-      if (/^"/.test(match)) {
-          if (/:$/.test(match)) {
-              color = red;
-          } else {
-              color = green;
-          }
-      } else if (/true|false/.test(match)) {
-          color = cyan;
-      } else if (/null/.test(match)) {
-          color = magenta;
-      }
-      return color + match + resetColor;
-  });
-}
-
-const yellow = str => `\x1b[33m${str}\x1b[0m`
 
 const cli = {}
 

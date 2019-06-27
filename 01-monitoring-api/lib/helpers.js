@@ -50,6 +50,18 @@ helpers.centered = str => {
   console.log(line)
 }
 
+helpers.centerSection = (name = 'Section Name') => {
+  helpers.verticalSpace()
+  helpers.centered(`============= ${name} =============`)
+  helpers.verticalSpace()
+}
+
+helpers.leftSection = (name = 'Section Name') => {
+  helpers.verticalSpace()
+  console.log(`======================== ${name} ======================== `)
+  helpers.verticalSpace()
+}
+
 helpers.percent = (value, total) => Math.round((value / total) * 100)
 
 helpers.formatTime = seconds => {
@@ -59,6 +71,38 @@ helpers.formatTime = seconds => {
   seconds = Math.floor(seconds % 60)
   return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds)
 }
+
+helpers.jsonHightlight = json => {
+  const resetColor = '\x1b[0m'
+  const yellow = '\x1b[33m'
+  const magenta = '\x1b[35m'
+  const cyan = '\x1b[36m'
+  const red = '\x1b[31m'
+  const green = '\x1b[32m'
+
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+      let color = yellow;
+      if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+              color = red;
+          } else {
+              color = green;
+          }
+      } else if (/true|false/.test(match)) {
+          color = cyan;
+      } else if (/null/.test(match)) {
+          color = magenta;
+      }
+      return color + match + resetColor;
+  });
+}
+
+helpers.yellow = str => `\x1b[33m${str}\x1b[0m`
+helpers.green = str => `\x1b[32m${str}\x1b[0m`
+helpers.red = str => `\x1b[31m${str}\x1b[0m`
+helpers.cyan = str => `\x1b[36m${str}\x1b[0m`
+helpers.magenta = str => `\x1b[35m${str}\x1b[0m`
+
 
 // SHA256 hash
 helpers.hash = str => {
