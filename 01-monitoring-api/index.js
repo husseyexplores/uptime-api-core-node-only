@@ -3,7 +3,7 @@ const workers = require('./lib/workers')
 const cli = require('./lib/cli')
 
 const app = {}
-app.init = () => {
+app.init = (callback = () => {}) => {
   // Start the server
   server.init()
 
@@ -14,9 +14,13 @@ app.init = () => {
   setTimeout(() => {
     cli.init()
   }, 1000 * 1);
-},
 
-// Start the app
-app.init()
+  callback()
+}
+
+// Self invoking only if required directly
+if (require.main === module) {
+  app.init()
+}
 
 module.exports = app

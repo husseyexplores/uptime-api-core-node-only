@@ -8,41 +8,19 @@ const {
   magenta,
   cyan,
 } = require('../lib/helpers')
-const assert = require('assert')
+
 
 /////////////////////////////////////////////////////////////////////////////////
+
+// Override the NODE_ENV variable
+process.env.NODE_ENV = 'testing'
 
 // App logic for the test runner
 const _app = {}
 
 _app.test = {
-  unit: {}
-}
-
-const { unit } = _app.test
-
-unit['helpers.getANumber should return a number'] = done => {
-  const value = getANumber()
-  assert.equal(typeof value, 'number')
-  done()
-}
-
-unit['helpers.getANumber should return 1 by default'] = done => {
-  const value = getANumber()
-  assert.equal(value, 1)
-  done()
-}
-
-unit['helpers.getANumber should return whatever is passed to it'] = done => {
-  const value = getANumber(5)
-  assert.equal(value, 5)
-  done()
-}
-
-unit['helpers.getANumber should return 2 by default'] = done => {
-  const value = getANumber()
-  assert.equal(value, 2)
-  done()
+  unit: require('./unit'),
+  api: require('./api'),
 }
 
 // Count all the tests
@@ -67,7 +45,6 @@ _app.countTests = () => {
 
 // Runs all the tests, collecting all the erros and success from those test
 _app.runTests = () => {
-  console.clear()
   const errors = []
   let success = 0
   const limit = _app.countTests()
@@ -124,13 +101,14 @@ _app.produceTestReport = (limit, success, errors) => {
       console.log(JSON.stringify(error, null, 2))
       verticalSpace()
       i + 1  !== errors.length && console.log('---------------------  ---------------------')
-      verticalSpace()
+      i + 1  !== errors.length && verticalSpace()
     })
 
     leftSection('END OF ERROR DETAILS')
   }
 
   leftSection('END OF TEST REPORT')
+  process.exit(0)
 }
 
 // Run the test

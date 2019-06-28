@@ -35,6 +35,22 @@ environments.production = {
   }
 }
 
+//  Testing env
+environments.testing = {
+  httpPort: 4000,
+  httpsPort: 4001,
+  envName: 'testing',
+  hashSalt: 'thisIsAsuperSecretHashingSalt',
+  maxChecks: 5,
+  twilio,
+  templateGlobals: {
+    ...templateGlobals,
+    baseUrl: 'http://localhost:4000/',
+  },
+
+}
+
+
 const currentEnv = typeof process.env.NODE_ENV === 'string' ? process.env.NODE_ENV.toLowerCase() : ''
 
 module.exports = environments[currentEnv] || environments.staging
